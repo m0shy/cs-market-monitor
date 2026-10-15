@@ -1,7 +1,7 @@
 # cs-market-monitor
 
 [![CI](https://github.com/m0shy/cs-market-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/m0shy/cs-market-monitor/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 [简体中文](README.md) · [English](README_ENG.md)
