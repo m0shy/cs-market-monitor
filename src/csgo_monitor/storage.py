@@ -1392,12 +1392,12 @@ class Storage:
         now_mono = time.monotonic()
         if min_interval > 0:
             with self._coverage_lock:
-                if now_mono - self._coverage_written.get(key, 0.0) < min_interval:
+                if now_mono - self._coverage_written.get(key, float("-inf")) < min_interval:
                     return
                 self._coverage_written[key] = now_mono
         with self._coverage_lock:
             snapshot_due = (
-                now_mono - self._coverage_snapshot_written.get(key, 0.0) >= 60.0
+                now_mono - self._coverage_snapshot_written.get(key, float("-inf")) >= 60.0
             )
             if snapshot_due:
                 self._coverage_snapshot_written[key] = now_mono
