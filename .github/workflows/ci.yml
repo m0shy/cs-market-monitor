@@ -37,5 +37,5 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
-      - run: pip install -e . pytest
+      - run: pip install -e . pytest fastapi jinja2 uvicorn httpx
       - run: python -m pytest tests/ -q
