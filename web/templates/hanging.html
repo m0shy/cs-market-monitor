@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}挂刀 / 搬砖 · CS2 Market Desk{% endblock %}
+{% block content %}
+
+<nav class="breadcrumb" aria-label="面包屑">
+  <a href="/research/rankings">排行榜</a><span>/</span><span>挂刀 / 搬砖</span>
+</nav>
+
+<header class="page-head">
+  <div>
+    <div class="eyebrow">Assets / Arbitrage</div>
+    <h1>挂刀 / 搬砖榜单</h1>
+    <p class="sub">公开快照的理论价差，净收益按固定 {{ (workspace.fee_rate * 100)|round|int }}% 费用假设估算；未计入汇率、深度和交割成本</p>
+  </div>
+  <div class="flex gap-2">
+    <span class="chip num">快照 · {{ workspace.generated_at|tslabel }}</span>
+    <a class="btn" href="/market/compare">比较报价</a>
+    <a class="btn primary" href="/market/items">浏览饰品</a>
+  </div>
+</header>
+
+{% set ar_status = freshness_status(workspace.rows[0].ts if workspace.rows else none, 'partial' if workspace.rows else 'collecting') %}
+<div class="flex-wrap" style="gap:8px;font-size:12px;color:var(--text-3);margin-bottom:12px">
+  <span class="tag info">行情站B 平台快照</span>
+  <span class="tag {{ 'down' if ar_status == 'ready' else ('warn' if ar_status in ('partial', 'stale', 'blocked', 'error') else 'flat') }}">{{ {'ready': '可用', 'partial': '部分覆盖', 'collecting': '采集中', 'stale': '数据过期', 'missing': '尚无数据', 'blocked': '来源受限', 'error': '读取失败'}.get(ar_status, ar_status) }}</span>
+  {% if workspace.rows %}<span class="num">更新 {{ market_time_label(workspace.rows[0].ts) }}（北京时间）</span>{% else %}<span>无更新时间</span>{% endif %}
+  <span>理论估算，不能据此认定可以执行或盈利</span>
+  <a href="/data/coverage">覆盖详情</a>
+</div>
+
+<section class="grid grid-4" style="margin-bottom:12px">
+  <article class="metric-card">
+    <span class="metric-label">候选标的 <span class="tag flat">近期快照</span></span>
+    <span class="metric-value" style="font-size:30px">{{ workspace.summary.total }}</span>
+    <span class="metric-sub">件 · 来自导购热度榜</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">净收益为正 <span class="tag flat">估算</span></span>
+    <span class="metric-value up" style="font-size:30px">{{ workspace.summary.positive }}</span>
+    <span class="metric-sub">件 · 卖出价 × {{ 100 - (workspace.fee_rate * 100)|round|int }}% - 买入价</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">最高净收益 <span class="tag warn">候选</span></span>
+    <span class="metric-value {{ 'up' if workspace.summary.best else '' }}" style="font-size:30px">{{ "%+.2f%%"|format(workspace.summary.best.net_rate) if workspace.summary.best else '—' }}</span>
+    <span class="metric-sub">{{ workspace.summary.best.name if workspace.summary.best else '暂无可用标的' }}</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">费用假设 <span class="tag flat">固定</span></span>
+    <span class="metric-value" style="font-size:30px">{{ (workspace.fee_rate * 100)|round|int }}%</span>
+    <span class="metric-sub">用于净收益展示</span>
+  </article>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <div class="panel-title"><h2>价差候选</h2><span class="sub">按净收益率排序 · 价格来自最新平台快照</span></div>
+  </div>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>#</th><th>饰品</th><th>买入（前价）</th><th class="num">买入价</th><th>卖出（后价）</th><th class="num">卖出价</th><th class="num">毛收益</th><th class="num">净收益</th><th class="num">导购挂单</th><th>比价</th></tr></thead>
+      <tbody>
+        {% for r in workspace.rows %}
+        <tr>
+          <td>{% if loop.index == 1 %}<span class="num" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border-radius:5px;font-size:12px;font-weight:700;background:#ffd700;color:#1a1206">1</span>
+            {% elif loop.index == 2 %}<span class="num" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border-radius:5px;font-size:12px;font-weight:700;background:#c0c0c0;color:#10141c">2</span>
+            {% elif loop.index == 3 %}<span class="num" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border-radius:5px;font-size:12px;font-weight:700;background:#cd7f32;color:#fff">3</span>
+            {% else %}<span class="num" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border-radius:5px;font-size:12px;font-weight:600;background:var(--surface-hi);border:1px solid var(--border-hi);color:var(--text-2)">{{ loop.index }}</span>{% endif %}</td>
+          <td>
+            <a class="flex gap-2" href="/market/items/{{ r.name|urlencode }}?from=/assets/arbitrage">
+              {% if r.profile.get('image_url') %}<img src="/api/image?url={{ r.profile.get('image_url')|urlencode }}" alt="" loading="lazy" style="width:32px;height:24px;object-fit:contain;flex:none">{% endif %}
+              <span><strong>{{ r.name }}</strong><br><span class="sub">{{ r.profile.get('rarity') or 'CS2 饰品' }}</span></span>
+            </a>
+          </td>
+          <td><span class="chip" style="border-color:var(--accent-border);color:var(--accent)">{{ r.buy_platform_label }}</span></td>
+          <td class="num" style="font-weight:600">¥{{ "%.2f"|format(r.buy_price) }}</td>
+          <td><span class="chip">{{ r.sell_platform_label }}</span></td>
+          <td class="num" style="font-weight:600">¥{{ "%.2f"|format(r.sell_price) }}</td>
+          <td class="num {{ 'up' if r.gross_rate >= 0 else 'down' }}">{{ "%+.2f%%"|format(r.gross_rate) }}</td>
+          <td class="num {{ 'up' if r.net_rate >= 0 else 'down' }}" style="font-weight:700">{{ "%+.2f%%"|format(r.net_rate) }}</td>
+          <td class="num">{{ "{:,}".format(r.supply|int) if r.supply is not none else '-' }}</td>
+          <td><a class="btn sm" href="/market/compare?q={{ r.name|urlencode }}">比价</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="10" class="empty">当前快照没有足够的平台报价</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="sub mt-3" style="font-size:12px">收益率只用于快速比较，实际成交价、手续费、提现路径和库存深度需要在对应平台再次确认。</p>
+</section>
+{% endblock %}

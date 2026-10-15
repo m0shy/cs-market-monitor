@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}饰品市场 · CS2 Market Desk{% endblock %}
+{% block content %}
+<style>
+.item-cell{display:flex;align-items:center;gap:10px;color:var(--text);min-width:0}
+.item-cell:hover{color:var(--text)}
+.item-cell strong{display:block;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-cell small{display:block;font-size:11px;color:var(--text-3)}
+.item-thumb{flex:none;width:52px;height:40px;border-radius:5px;background:var(--surface-active);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.item-thumb img{width:100%;height:100%;object-fit:contain}
+.rarity-mark{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.attr-tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:11px;background:var(--surface-active);color:var(--text-2)}
+.low-tag{display:inline-block;margin-left:6px;padding:0 5px;border-radius:3px;font-size:10px;color:var(--down);background:var(--down-soft);vertical-align:1px}
+.pager{display:flex;align-items:center;justify-content:space-between;margin-top:var(--sp-3);font-size:13px;color:var(--text-3)}
+.pager b{color:var(--text);font-family:var(--mono)}
+.pager a{color:var(--accent)}
+.filter-bar{display:flex;flex-wrap:wrap;gap:var(--sp-3);align-items:flex-end}
+.filter-bar label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text-3)}
+.skeleton{height:12px;width:64px;border-radius:3px;background:linear-gradient(90deg,var(--surface-active),var(--surface-hi),var(--surface-active));background-size:200% 100%;animation:sk 1.2s infinite linear}
+@keyframes sk{from{background-position:200% 0}to{background-position:-200% 0}}
+</style>
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Asset screener</span>
+    <h1>饰品市场</h1>
+    <p class="sub">{{ "{:,}".format(total) }} 件目录标的 · 按名称、类型、稀有度与磨损查找</p>
+  </div>
+  <div class="flex">
+    <span class="sub" id="quote-refresh">报价加载中…</span>
+    <a class="btn" href="/market/compare">跨平台比较</a>
+  </div>
+</header>
+
+<section class="panel">
+  <form class="filter-bar" method="get" action="/market/items">
+    <label style="flex:1;min-width:220px">饰品名称
+      <span class="input-shell">
+        <input type="search" name="q" value="{{ q }}" placeholder="AK-47 | Redline" autocomplete="off">
+      </span>
+    </label>
+    <label>类型
+      <select name="item_type" onchange="this.form.submit()">
+        <option value="">全部类型</option>
+        {% for o in type_options %}<option value="{{ o.value }}" {{ 'selected' if o.value == item_type else '' }}>{{ type_labels.get(o.value, o.value) }} ({{ o.count }})</option>{% endfor %}
+      </select>
+    </label>
+    <label>稀有度
+      <select name="rarity" onchange="this.form.submit()">
+        <option value="">全部稀有度</option>
+        {% for o in rarity_options %}<option value="{{ o.value }}" {{ 'selected' if o.value == rarity else '' }}>{{ o.value }} ({{ o.count }})</option>{% endfor %}
+      </select>
+    </label>
+    <label>磨损
+      <select name="exterior" onchange="this.form.submit()">
+        <option value="">全部磨损</option>
+        {% for o in exterior_options %}<option value="{{ o.value }}" {{ 'selected' if o.value == exterior else '' }}>{{ o.value }} ({{ o.count }})</option>{% endfor %}
+      </select>
+    </label>
+    <label>排序
+      <select name="sort" onchange="this.form.submit()">
+        <option value="name" {{ 'selected' if sort == 'name' else '' }}>名称</option>
+        <option value="updated" {{ 'selected' if sort == 'updated' else '' }}>最近更新</option>
+      </select>
+    </label>
+    <div class="flex">
+      <button type="submit" class="btn primary">筛选</button>
+      {% if q or item_type or rarity or exterior %}<a class="btn ghost" href="/market/items">清空</a>{% endif %}
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <div class="panel-title"><h2>筛选结果</h2><span class="sub">第 {{ page }} / {{ pages }} 页 · 每页 {{ size }} 件</span></div>
+    <span class="tag info">行情站B CATALOG</span>
+  </div>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>饰品</th><th>属性</th>
+          <th class="num">BUFF 在售价</th>
+          <th class="num">导购挂单</th><th>数据更新</th><th aria-label="操作"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set back = (request.url.path ~ ('?' ~ request.url.query if request.url.query else ''))|urlencode %}
+        {% for it in items %}
+        <tr data-id="{{ it.item_id }}">
+          <td>
+            <a class="item-cell" href="/market/items/{{ it.market_hash_name|urlencode }}?from={{ back }}">
+              <span class="item-thumb">
+                {% if it.profile.get('image_url') %}
+                <img src="/api/image?url={{ it.profile.get('image_url')|urlencode }}" alt="{{ it.market_hash_name }}" loading="lazy">
+                {% endif %}
+              </span>
+              <span>
+                <strong>{{ it.market_hash_name }}</strong>
+                {% if it.name and it.name != it.market_hash_name %}<small>{{ it.name }}</small>{% endif %}
+              </span>
+            </a>
+          </td>
+          <td>
+            <span class="flex-wrap" style="display:flex;gap:4px;flex-wrap:wrap">
+              {% if it.profile.get('rarity') %}<span class="attr-tag"><i class="rarity-mark" style="background:{{ it.profile.get('rarity_color', '#808793') }}"></i>{{ it.profile.get('rarity') }}</span>{% endif %}
+              {% if it.profile.get('exterior') %}<span class="attr-tag">{{ it.profile.get('exterior') }}</span>{% endif %}
+              {% if it.has_styles %}<span class="tag warn">特殊款式</span>{% endif %}
+            </span>
+          </td>
+          <td class="num q-buff"><div class="skeleton"></div></td>
+          <td class="num q-broker"><div class="skeleton"></div></td>
+          <td class="muted"><span class="reltime" data-ts="{{ it.updated_at }}">{{ (it.updated_at or '')[:16] }}</span></td>
+          <td><a class="btn ghost sm" href="/market/items/{{ it.market_hash_name|urlencode }}?from={{ back }}" aria-label="查看 {{ it.market_hash_name }}">详情</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="empty">
+          <div class="empty-state"><p>没有匹配的饰品，尝试减少筛选条件或使用英文市场名。</p><a class="btn sm" href="/market/items">清空筛选</a></div>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <nav class="pager" aria-label="分页">
+    {% set base = '/market/items?q=' ~ q|urlencode ~ '&item_type=' ~ item_type|urlencode ~ '&rarity=' ~ rarity|urlencode ~ '&exterior=' ~ exterior|urlencode ~ '&sort=' ~ sort ~ '&size=' ~ size %}
+    {% if page > 1 %}<a href="{{ base }}&page={{ page - 1 }}">← 上一页</a>{% else %}<span></span>{% endif %}
+    <span>第 <b>{{ page }}</b> / <b>{{ pages }}</b> 页</span>
+    {% if page < pages %}<a href="{{ base }}&page={{ page + 1 }}">下一页 →</a>{% endif %}
+  </nav>
+</section>
+{% endblock %}

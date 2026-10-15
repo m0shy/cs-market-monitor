@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}CS2 更新记录 · CS2 Market Desk{% endblock %}
+{% block content %}
+
+<nav class="crumb" aria-label="面包屑">
+  <a href="/"><i data-lucide="arrow-left" aria-hidden="true"></i>市场总览</a>
+  <span class="sep">/</span>
+  <span aria-current="page">CS2 更新记录</span>
+</nav>
+
+<header class="workspace-head">
+  <div>
+    <span class="eyebrow">CS2 update records</span>
+    <h1>CS2 更新记录</h1>
+    <p>保留更新记录的父页面入口，并把本地采集覆盖和接口状态放在同一处。</p>
+  </div>
+  <div class="workspace-actions">
+    <span class="data-source">{{ '接口已发现' if workspace.endpoint else '等待接口快照' }}</span>
+    <a class="btn primary" href="/data/coverage"><i data-lucide="database-zap" aria-hidden="true"></i>查看采集进度</a>
+  </div>
+</header>
+
+<section class="metric-grid updates-metrics">
+  <article class="metric-card primary">
+    <div class="metric-top"><span class="metric-label"><i data-lucide="scroll-text" aria-hidden="true"></i>记录状态</span><span class="metric-status {{ 'live' if workspace.status == 'ready' else 'warning' }}">{{ 'READY' if workspace.status == 'ready' else 'PENDING' }}</span></div>
+    <div class="metric-main"><strong class="metric-value smaller">{{ '已接入' if workspace.status == 'ready' else '待入库' }}</strong></div>
+    <div class="metric-meta"><span>{{ workspace.message }}</span></div>
+  </article>
+  <article class="metric-card">
+    <div class="metric-top"><span class="metric-label"><i data-lucide="list-checks" aria-hidden="true"></i>本地记录</span><span class="metric-status">LOCAL</span></div>
+    <div class="metric-main"><strong class="metric-value">{{ workspace.records|length }}</strong><span class="metric-unit">条</span></div>
+    <div class="metric-meta"><span>已解析更新记录</span></div>
+  </article>
+  <article class="metric-card">
+    <div class="metric-top"><span class="metric-label"><i data-lucide="radio-tower" aria-hidden="true"></i>接口状态</span><span class="metric-status">行情站B</span></div>
+    <div class="metric-main"><strong class="metric-value smaller">{{ '已发现' if workspace.endpoint else '未发现' }}</strong></div>
+    <div class="metric-meta"><span>{{ workspace.endpoint.path if workspace.endpoint else '等待首次响应' }}</span></div>
+  </article>
+</section>
+
+<section class="updates-layout">
+  <section class="panel updates-record-panel">
+    <div class="panel-head">
+      <div class="panel-title"><div class="section-icon"><i data-lucide="scroll-text" aria-hidden="true"></i></div><div><h2>更新记录流</h2><span class="sub">按时间查看 CS2 版本与内容变更</span></div></div>
+    </div>
+    <div class="update-timeline">
+      {% for record in workspace.records %}
+      <article class="update-entry">
+        <span class="update-dot"></span>
+        <div><span class="eyebrow">{{ record.ts|tslabel }}</span><h3>{{ record.title }}</h3><p>{{ record.type or "" }}</p></div>
+      </article>
+      {% else %}
+      <div class="empty-state compact">
+        <i data-lucide="clock-3" aria-hidden="true"></i>
+        <strong>本地还没有更新记录</strong>
+        <span>接口发现后，响应会在采集任务写入完成时显示在这里。</span>
+        <a class="btn sm" href="/data/coverage"><i data-lucide="refresh-cw" aria-hidden="true"></i>检查采集状态</a>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <aside class="updates-side">
+    <section class="panel">
+      <div class="panel-head"><div class="panel-title"><div class="section-icon"><i data-lucide="radio-tower" aria-hidden="true"></i></div><div><h2>接口覆盖</h2><span class="sub">最近一次发现</span></div></div></div>
+      {% if workspace.endpoint %}
+      <dl class="endpoint-facts">
+        <div><dt>方法</dt><dd>{{ workspace.endpoint.method }}</dd></div>
+        <div><dt>路径</dt><dd class="mono-break">{{ workspace.endpoint.path }}</dd></div>
+        <div><dt>成功次数</dt><dd>{{ workspace.endpoint.successful }}</dd></div>
+        <div><dt>最近看到</dt><dd>{{ workspace.endpoint.last_seen[:16] }}</dd></div>
+      </dl>
+      {% else %}
+      <div class="empty-state compact"><i data-lucide="search-x" aria-hidden="true"></i><strong>等待接口快照</strong><span>采集器发现页面请求后会自动补齐状态。</span></div>
+      {% endif %}
+    </section>
+    <section class="panel">
+      <div class="panel-head"><div class="panel-title"><div class="section-icon"><i data-lucide="database" aria-hidden="true"></i></div><div><h2>覆盖记录</h2><span class="sub">本地数据集</span></div></div></div>
+      <div class="coverage-list">
+        {% for row in workspace.coverage %}
+        <div><span>{{ row.dataset }}</span><b>{{ row.checked_at[:16] }}</b></div>
+        {% else %}
+        <div><span>暂无更新数据集</span><b>—</b></div>
+        {% endfor %}
+      </div>
+    </section>
+  </aside>
+</section>
+{% endblock %}

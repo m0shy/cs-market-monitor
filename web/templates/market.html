@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}市场指数 · CS2 Market Desk{% endblock %}
+{% block content %}
+{% set primary = sources.get(initial_source|default('siteb'), {}) %}
+<style>
+.seg{display:inline-flex;background:var(--bg-raised);border:1px solid var(--border-hi);border-radius:var(--r-sm);padding:2px;gap:2px;overflow-x:auto;scrollbar-width:none}
+.seg button{padding:4px 12px;border-radius:4px;font-size:12px;color:var(--text-2);white-space:nowrap}
+.seg button.active{background:var(--accent-soft);color:var(--accent)}
+.index-rail{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(280px,1fr);gap:var(--sp-3);overflow-x:auto;padding-bottom:2px}
+.index-card{background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r);padding:var(--sp-4);text-align:left;transition:border-color var(--t-fast)}
+.index-card:hover{border-color:var(--border-hi)}
+.index-card[aria-pressed="true"]{border-color:var(--accent-border);background:var(--accent-soft)}
+.source-logo{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:var(--r-sm);font-weight:800;font-size:12px;color:#fff;flex:none}
+.source-logo.siteb{background:linear-gradient(135deg,#4d8dff,#2f6fe0)}
+.source-logo.sitea{background:linear-gradient(135deg,#ff9f43,#ff6b6b)}
+.pill{font-family:var(--mono);font-size:13px;font-weight:600;padding:1px 6px;border-radius:4px}
+.stat-diff.up .pill{background:var(--up-soft)}
+.stat-diff.down .pill{background:var(--down-soft)}
+.ohlc{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--sp-2)}
+.ohlc span{display:flex;justify-content:space-between;font-size:12px;color:var(--text-3)}
+.ohlc b{font-family:var(--mono);font-size:14px;color:var(--text);font-variant-numeric:tabular-nums}
+.dist-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--surface-active);margin:8px 0}
+.dist-bar i{display:block;height:100%}
+.dist-bar i.up{background:var(--up)}
+.dist-bar i.down{background:var(--down)}
+.dist-bar i.flat{background:var(--flat)}
+.dist-legend{display:flex;justify-content:space-between;font-size:12px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.dist-legend b{color:var(--text);font-family:var(--mono)}
+.market-workspace{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:var(--sp-3)}
+@media(max-width:1100px){.market-workspace{grid-template-columns:1fr}}
+.cov-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.cov-row:last-of-type{border-bottom:none}
+.cov-row b{font-size:12px;color:var(--text-2);font-variant-numeric:tabular-nums}
+.cmp-btn{display:flex;align-items:center;gap:10px;width:100%;padding:10px;border-radius:var(--r-sm);background:var(--bg-raised);border:1px solid var(--border);text-align:left;transition:border-color var(--t-fast)}
+.cmp-btn:hover{border-color:var(--border-hi)}
+.cmp-btn[aria-pressed="true"]{border-color:var(--accent-border)}
+.cmp-btn strong{display:block;font-size:13px;color:var(--text)}
+.cmp-btn small{font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.cmp-val{margin-left:auto;text-align:right}
+.cmp-val b{display:block;font-family:var(--mono);font-size:15px;color:var(--text);font-variant-numeric:tabular-nums}
+</style>
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Market index</span>
+    <h1>市场指数</h1>
+    <p class="sub">行情站B 与 行情站A 独立指数并行观察，行情方向、市场宽度与数据覆盖分开标注。</p>
+  </div>
+  <div class="flex">
+    <a class="btn" href="/research/sections">板块指数</a>
+    <a class="btn" href="/research/breadth">市场宽度</a>
+    <a class="btn primary" href="/research/rankings">排行榜</a>
+  </div>
+</header>
+
+<div class="flex-between mb-3" id="market-provenance" style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r);padding:6px 12px;font-size:12px;color:var(--text-3)">
+  <span class="flex gap-2"><span class="provenance-source">{{ primary.get('name', '行情站B / 行情站A 独立指数') }}</span><span class="provenance-state" style="color:var(--accent)">可用</span></span>
+  <span>更新 <time>{{ market_time_label(primary.get('as_of')) }}</time>（北京时间） · 独立指数不拼接不同定义的数据</span>
+</div>
+
+<section class="index-rail" aria-label="指数来源">
+  {% for key in ['siteb', 'sitea'] %}
+  {% set source = sources.get(key, {}) %}
+  <button type="button" class="index-card" data-market-source="{{ key }}" role="tab"
+          aria-pressed="{{ 'true' if initial_source|default('siteb') == key else 'false' }}">
+    <div class="flex-between mb-2">
+      <span class="flex"><span class="source-logo {{ key }}">{{ 'SD' if key == 'siteb' else 'CQ' }}</span><span><strong style="font-size:13px">{{ source.get('short_name', key|upper) }}</strong><small class="sub" style="display:block">{{ '饰品大盘指数' if key == 'siteb' else '综合市场指数' }}</small></span></span>
+      <span class="tag flat">小时级采集</span>
+    </div>
+  {% if key == 'siteb' %}
+    <div class="flex gap-3" style="align-items:baseline">
+      <strong class="metric-value" style="font-size:30px">{{ "%.2f"|format(source.get('value')) if source.get('value') is not none else '未覆盖' }}</strong>
+      <span class="stat-diff {{ 'up' if (source.get('change_rate') or 0) >= 0 else 'down' }}">{{ "%+.2f%%"|format(source.get('change_rate')) if source.get('change_rate') is not none else '—' }}</span>
+    </div>
+    <div class="metric-sub mt-1">更新时间 <b>{{ market_time_label(source.get('as_of')) }}</b></div>
+    {% else %}
+    <div class="flex gap-3" style="align-items:baseline">
+      <strong class="metric-value" style="font-size:30px">{{ "%.2f"|format(source.get('value')) if source.get('value') is not none else '未覆盖' }}</strong>
+      <span class="stat-diff {{ 'up' if (source.get('change_rate') or 0) >= 0 else 'down' }}">{{ "%+.2f%%"|format(source.get('change_rate')) if source.get('change_rate') is not none else '—' }}</span>
+    </div>
+    <div class="metric-sub mt-1">更新时间 <b>{{ market_time_label(source.get('as_of')) }}</b></div>
+    {% endif %}
+  </button>
+  {% endfor %}
+</section>
+
+<div class="seg mt-3" id="market-period-tabs" role="tablist" aria-label="指数周期">
+  {% for p, label in [('1hour','1 小时'),('4hour','4 小时'),('1day','日 K 历史'),('7day','周 K 观测'),('15day','15 天'),('30day','30 天')] %}
+  <button data-market-period="{{ p }}" class="{{ 'active' if initial_period|default('1day') == p else '' }}" role="tab">{{ label }}</button>
+  {% endfor %}
+</div>
+
+<section class="grid grid-4 mt-3" aria-label="指数摘要">
+  <article class="metric-card">
+    <div class="flex-between"><span class="metric-label" id="market-source-name">{{ primary.get('name', '行情站B 饰品指数') }}</span><span class="tag info" id="market-source-badge">{{ initial_source|default('siteb')|upper }}</span></div>
+    <div class="metric-value" id="market-source-value">{{ "%.2f"|format(primary.get('value')) if primary.get('value') is not none else '未覆盖' }}</div>
+    <span class="stat-diff {{ 'up' if (primary.get('change_rate') or 0) >= 0 else 'down' }}" id="market-source-change">
+      <span class="pill">{{ "%+.2f%%"|format(primary.get('change_rate')) if primary.get('change_rate') is not none else '—' }}</span>
+      <span>{{ "%+.2f"|format(primary.get('change')) if primary.get('change') is not none else '—' }}</span>
+    </span>
+    <div class="metric-sub">更新时间（北京时间）<b id="market-source-asof">{{ market_time_label(primary.get('as_of')) }}</b></div>
+  </article>
+
+  <article class="metric-card">
+    <div class="flex-between"><span class="metric-label">最近日 K · 今日高低</span><span class="tag flat">OHLC</span></div>
+    <div class="ohlc mt-2">
+      <span>开盘<b id="market-open">{{ "%.2f"|format(primary.get('open')) if primary.get('open') is not none else '-' }}</b></span>
+      <span>最高<b id="market-high" class="up">{{ "%.2f"|format(primary.get('high')) if primary.get('high') is not none else '-' }}</b></span>
+      <span>最低<b id="market-low" class="down">{{ "%.2f"|format(primary.get('low')) if primary.get('low') is not none else '-' }}</b></span>
+      <span>收盘<b id="market-close">{{ "%.2f"|format(primary.get('candle_close')) if primary.get('candle_close') is not none else '-' }}</b></span>
+    </div>
+    <div class="metric-sub">日 K 更新 <b id="market-candle-asof">{{ market_time_label(primary.get('candle_as_of')) }}</b></div>
+  </article>
+
+  <article class="metric-card">
+    <div class="flex-between"><span class="metric-label">市场流量</span><span class="tag info">当日</span></div>
+    <div class="metric-value" style="font-size:28px" id="market-trade-count">{{ primary.get('trade_count') or '-' }}</div>
+    <div class="metric-sub">成交额 <b id="market-turnover">{{ primary.get('turnover') or '-' }}</b></div>
+    <div class="metric-sub">存世量 <b id="market-supply">{{ primary.get('supply') or '-' }}</b> · 持有人 <b id="market-holders">{{ primary.get('holders') or '-' }}</b></div>
+  </article>
+
+  <article class="metric-card">
+    <div class="flex-between"><span class="metric-label">市场宽度</span><span class="tag flat">±0.5%</span></div>
+    <div class="metric-value" style="font-size:22px" id="breadth-ratio">-</div>
+    <div class="dist-bar" id="breadth-bar"></div>
+    <div class="dist-legend"><span>↑ <b id="b-up">-</b></span><span>平 <b id="b-flat">-</b></span><span>↓ <b id="b-down">-</b></span></div>
+  </article>
+</section>
+
+<div class="market-workspace">
+  <section class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><h2 id="market-chart-title">行情站B 全部公开 K 线</h2><span class="sub" id="market-chart-range">正在读取时间范围</span></div>
+      <div class="flex">
+        <div class="seg" id="market-view" role="tablist" aria-label="数据范围">
+          <button type="button" data-market-view="full" class="active" aria-selected="true">全部公开 K 线</button>
+          <button type="button" data-market-view="candles" aria-selected="false">仅日 K</button>
+        </div>
+        <button class="btn sm" type="button" id="market-refresh" aria-label="刷新行情" title="刷新行情"><i data-lucide="refresh-cw" aria-hidden="true"></i></button>
+      </div>
+    </div>
+    <div class="chart-box" id="market-analysis-box" style="min-height:440px">
+      <div id="market-analysis-chart" role="img" aria-label="市场指数 K 线图"></div>
+      <div class="chart-loading hidden" id="market-analysis-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-3);font-size:13px">指数行情加载中…</div>
+    </div>
+    <p class="sub mt-2" id="market-chart-freshness" aria-live="polite">正在检查行情时间；每分钟自动读取已采集更新。</p>
+  </section>
+
+  <aside>
+    <section class="panel">
+      <div class="panel-head"><div class="panel-title"><h2>数据覆盖</h2><span class="sub">当前来源与周期</span></div></div>
+      <div class="cov-row"><span>OHLC 行情</span><b id="coverage-ohlc">读取中</b></div>
+      <div class="cov-row"><span>成交笔数</span><b id="coverage-volume">读取中</b></div>
+      <div class="cov-row"><span>成交金额</span><b id="coverage-turnover">读取中</b></div>
+      <p class="sub mt-2" id="coverage-note">数据缺口会明确标注，不使用零值代替缺失值。</p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div class="panel-title"><h2>来源对照</h2><span class="sub">独立指数不可混算</span></div></div>
+      <div class="source-compare" style="display:grid;gap:var(--sp-2)">
+        {% for key in ['siteb', 'sitea'] %}
+        {% set source = sources.get(key, {}) %}
+        <button type="button" class="cmp-btn" data-market-source="{{ key }}" aria-pressed="{{ 'true' if initial_source|default('siteb') == key else 'false' }}">
+          <span class="source-logo {{ key }}">{{ 'SD' if key == 'siteb' else 'CQ' }}</span>
+          <span><strong>{{ source.get('short_name', key|upper) }}</strong><small class="compare-asof">{{ market_time_label(source.get('as_of')) }}</small></span>
+          <span class="cmp-val compare-value">
+            <b>{{ "%.2f"|format(source.get('value')) if source.get('value') is not none else '-' }}</b>
+            <small class="{{ 'up' if (source.get('change_rate') or 0) >= 0 else 'down' }}">{{ "%+.2f%%"|format(source.get('change_rate')) if source.get('change_rate') is not none else '-' }}</small>
+          </span>
+        </button>
+        {% endfor %}
+      </div>
+      <p class="sub mt-3">切换来源会整体替换图表与摘要数据，不同定义的指数不做拼接。</p>
+    </section>
+  </aside>
+</div>
+
+<script id="market-sources-data"
+        data-initial-source="{{ initial_source|default('siteb') }}"
+        data-initial-period="{{ initial_period|default('1day') }}"
+        type="application/json">{{ sources|tojson }}</script>
+{% endblock %}

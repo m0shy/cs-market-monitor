@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}实时监控 · CS2 Market Desk{% endblock %}
+
+{% block content %}
+<div id="realtime-root" data-snapshot='{{ snapshot_json }}'>
+
+  <header class="page-head">
+    <div>
+      <div class="eyebrow">监控中心 / 实时</div>
+      <h1 class="flex gap-2">实时监控
+        <span class="tag info" style="margin-top:4px">分钟级</span>
+      </h1>
+      <p class="sub">SSE 推送通道 · 新数据到达后 2 秒内自动更新，不消耗请求配额</p>
+    </div>
+    <div class="flex" style="flex-direction:column;align-items:flex-end;gap:2px">
+      <span class="flex gap-1"><span class="rt-live-dot" id="rt-conn-dot" data-state="off"></span><span id="rt-conn-text" style="font-size:13px">连接中…</span></span>
+      <span class="sub num" id="rt-server-time">—</span>
+    </div>
+  </header>
+
+  <div class="flex-wrap" style="gap:8px;margin-bottom:12px">
+    <span class="chip" id="rt-ws-collector" title="行情站B 推送采集器">推送采集器 <b class="rt-pill-value" style="color:var(--text);font-weight:600">—</b></span>
+    <span class="chip" id="rt-supervisor" title="任务监督器">监督器 <b class="rt-pill-value" style="color:var(--text);font-weight:600">—</b></span>
+    <span class="chip" id="rt-active-tasks" title="运行中的采集任务">活动任务 <b class="rt-pill-value" style="color:var(--text);font-weight:600">—</b></span>
+    <span class="chip" id="rt-pauses" title="站点共享暂停（额度/限流）">站点暂停 <b class="rt-pill-value" style="color:var(--text);font-weight:600">无</b></span>
+    <span class="chip" id="rt-freshness" title="最近一条实时数据距今">数据时延 <b class="rt-pill-value" style="color:var(--text);font-weight:600">—</b></span>
+  </div>
+
+  <div id="rt-stale-banner" class="hidden" style="background:var(--danger-soft);border:1px solid var(--danger);color:var(--danger);padding:8px 16px;border-radius:var(--r-sm);margin-bottom:10px;font-size:13px">
+    ⚠ 数据流已中断超过 90 秒——正在自动重连；期间页面数据可能过期。
+  </div>
+
+  <section class="grid grid-3" id="rt-stats-grid" style="margin-bottom:12px">
+    <div class="metric-card rt-stat-card" data-metric="survive_num">
+      <span class="metric-label">存世量</span>
+      <span class="metric-value rt-stat-value" style="font-size:22px">—</span>
+      <span class="metric-sub rt-stat-ts">—</span>
+    </div>
+    <div class="metric-card rt-stat-card" data-metric="holders_num">
+      <span class="metric-label">持有人数</span>
+      <span class="metric-value rt-stat-value" style="font-size:22px">—</span>
+      <span class="metric-sub rt-stat-ts">—</span>
+    </div>
+    <div class="metric-card rt-stat-card" data-metric="add_num">
+      <span class="metric-label">今日新增</span>
+      <span class="metric-value rt-stat-value" style="font-size:22px">—</span>
+      <span class="metric-sub rt-stat-ts">—</span>
+    </div>
+    <div class="metric-card rt-stat-card" data-metric="add_valuation">
+      <span class="metric-label">新增估值(¥)</span>
+      <span class="metric-value rt-stat-value" style="font-size:22px">—</span>
+      <span class="metric-sub rt-stat-ts">—</span>
+    </div>
+    <div class="metric-card rt-stat-card" data-metric="trade_num">
+      <span class="metric-label">成交笔数</span>
+      <span class="metric-value rt-stat-value" style="font-size:22px">—</span>
+      <span class="metric-sub rt-stat-ts">—</span>
+    </div>
+    <div class="metric-card rt-stat-card" data-metric="turnover">
+      <span class="metric-label">成交额(¥)</span>
+      <span class="metric-value rt-stat-value" style="font-size:22px">—</span>
+      <span class="metric-sub rt-stat-ts">—</span>
+    </div>
+  </section>
+
+  <section class="grid grid-2" style="margin-bottom:12px">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><h2>大盘指数（实时）</h2><span class="tag info">分钟级</span></div>
+        <span class="num" id="rt-index-value" style="font-size:18px;font-weight:700">—</span>
+      </div>
+      <div class="chart-box" id="rt-index-chart" style="min-height:220px"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><h2>大盘小时 K 线（推送）</h2></div>
+        <span class="sub" id="rt-kline-hint"></span>
+      </div>
+      <div class="chart-box" id="rt-kline-chart" style="min-height:220px"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="dashboard-panel">
+    <div class="panel-head">
+      <div class="panel-title"><h2>市场看盘台</h2><span class="tag warn">小时级</span></div>
+      <span class="sub">跨平台价差 · 热门成交 · 实时更新（每小时刷新）</span>
+    </div>
+    <div class="grid grid-2">
+      <div>
+        <h3 style="font-size:13px;color:var(--text-2);margin-bottom:8px">跨平台净价差 TOP10</h3>
+        <div class="table-scroll" style="max-height:360px">
+          <table class="data-table" style="font-size:12px">
+            <thead><tr><th>饰品</th><th>低价</th><th>高价</th><th>毛差%</th><th>净差%</th></tr></thead>
+            <tbody id="dash-spreads-body"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <h3 style="font-size:13px;color:var(--text-2);margin-bottom:8px">今日成交 TOP20</h3>
+        <div class="table-scroll" style="max-height:360px">
+          <table class="data-table" style="font-size:12px">
+            <thead><tr><th>饰品</th><th class="num">成交笔数</th></tr></thead>
+            <tbody id="dash-hot-body"><tr><td colspan="2" class="muted">加载中…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div id="dash-market-bar" class="num" style="display:flex;gap:16px;padding:12px 0 8px;font-size:13px;color:var(--text-2)"></div>
+    <div>
+      <h3 style="font-size:13px;color:var(--text-2);margin:8px 0">信号简报（吸筹 / 放量 / 价差 · 描述性，非交易指令）</h3>
+      <table class="data-table" style="font-size:12px">
+        <tbody id="rt-signals-body"><tr><td class="muted">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><h2>新上架饰品实时流</h2><span class="tag info">分钟级</span></div>
+      <span class="sub num" id="rt-listing-count">0 条</span>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table" id="rt-listing-table">
+        <thead>
+          <tr><th>时间</th><th>饰品标识</th><th class="num">估价(¥)</th><th class="num">磨损</th></tr>
+        </thead>
+        <tbody id="rt-listing-body"></tbody>
+      </table>
+      <div class="empty-state hidden" id="rt-listing-empty">等待实时上架推送…</div>
+    </div>
+  </section>
+</div>
+{% endblock %}

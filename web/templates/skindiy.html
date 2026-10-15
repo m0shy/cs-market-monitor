@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}饰品 DIY · CS2 Market Desk{% endblock %}
+{% block content %}
+{% set selected = workspace.selected %}
+{% set profile = workspace.profile %}
+
+<header class="page-head">
+  <div>
+    <div class="eyebrow">Assets / Workshop</div>
+    <h1>饰品 DIY</h1>
+    <p class="sub">组合磨损、图案和贴纸槽位记录方案，再回到行情详情核对真实报价</p>
+  </div>
+  <a class="btn primary" href="/market/items">查找基础饰品</a>
+</header>
+
+<section class="grid" id="diy-workspace" style="grid-template-columns:300px 1fr 260px;align-items:start">
+  <aside class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><h2>基础饰品</h2><span class="sub">来自当前热度榜</span></div>
+    </div>
+    <span class="input-shell mb-3"><input id="diy-choice-filter" type="search" placeholder="筛选饰品名称"></span>
+    <div style="max-height:520px;overflow-y:auto;display:flex;flex-direction:column;gap:2px">
+      {% for choice in workspace.choices %}
+      <a data-diy-choice="{{ choice.name }}" title="{{ choice.name }}" href="/assets/skin-diy?name={{ choice.name|urlencode }}"
+         style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;font-size:12px;color:var(--text-2);border:1px solid transparent">
+        {% if choice.profile.get('image_url') %}<img src="/api/image?url={{ choice.profile.get('image_url')|urlencode }}" alt="" loading="lazy" style="width:32px;height:24px;object-fit:contain;flex:none">{% endif %}
+        <span style="min-width:0"><strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)">{{ choice.name }}</strong>
+        <span class="num">{{ "%.2f"|format(choice.price) if choice.price is not none else '-' }} · 在售 {{ "{:,}".format(choice.supply|int) if choice.supply is not none else '-' }}</span></span>
+      </a>
+      {% else %}
+      <div class="empty">暂无可用饰品</div>
+      {% endfor %}
+    </div>
+  </aside>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><h2>方案预览</h2><span class="sub" id="diy-preview-sub">{{ profile.get('market_short_name') or workspace.selected_name or '尚未选择饰品' }}</span></div>
+      {% if workspace.selected_name %}<a class="btn sm" href="/market/items/{{ workspace.selected_name|urlencode }}?from=/assets/skin-diy">打开饰品详情</a>{% endif %}
+    </div>
+    <div class="flex gap-4" style="align-items:flex-start">
+      <div style="width:180px;height:135px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--bg-raised);border:1px solid var(--border);border-bottom:3px solid {{ profile.get('rarity_color', '#67b5ff') }};border-radius:var(--r)">
+        {% if profile.get('image_url') %}<img id="diy-preview-image" src="/api/image?url={{ profile.get('image_url')|urlencode }}" alt="{{ workspace.selected_name }}" style="object-fit:contain">{% else %}<span class="muted" style="font-size:28px">🎨</span>{% endif %}
+      </div>
+      <div style="min-width:0">
+        <span class="tag info" id="diy-type-badge">{{ profile.get('item_type_label') or '饰品' }}</span>
+        <h3 id="diy-preview-name" style="font-size:16px;font-weight:600;margin:8px 0 4px">{{ profile.get('market_short_name') or workspace.selected_name or '未选择基础饰品' }}</h3>
+        <p class="sub num" id="diy-preview-config">磨损：崭新出厂 · 图案：0 · 贴纸：0</p>
+      </div>
+    </div>
+    <div class="grid grid-3 mt-4">
+      <div class="metric-card">
+        <span class="metric-label">基础市场参考</span>
+        <span class="metric-value num" id="diy-base-price" style="font-size:22px">{{ "%.2f"|format(selected.price) if selected.price is not none else '-' }}</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">方案加成记录</span>
+        <span class="metric-value num" id="diy-addon-price" style="font-size:22px">+0.00</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">方案参考值</span>
+        <span class="metric-value num up" id="diy-total-price" style="font-size:22px">{{ "%.2f"|format(selected.price) if selected.price is not none else '-' }}</span>
+      </div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><h2>方案参数</h2></div>
+    </div>
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-3);margin-bottom:12px">
+      磨损版本
+      <select id="diy-wear"><option>崭新出厂</option><option>略有磨损</option><option>久经沙场</option><option>破损不堪</option><option>战痕累累</option></select>
+    </label>
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-3);margin-bottom:12px">
+      图案模板
+      <span class="input-shell"><input id="diy-pattern" type="number" min="0" max="9999" value="0"></span>
+    </label>
+    <div style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-3);margin-bottom:12px">
+      贴纸槽位
+      <div class="flex gap-2" id="diy-stickers">
+        {% for slot in range(1, 5) %}<label class="chip"><input type="checkbox" data-sticker-slot="{{ slot }}"><span>{{ slot }}</span></label>{% endfor %}
+      </div>
+    </div>
+    <p class="sub" style="font-size:12px;margin-bottom:12px">方案参数是研究记录，最终成交价以平台报价与实物检查为准。</p>
+    <button class="btn w-full" id="diy-reset" type="button">恢复默认参数</button>
+  </aside>
+</section>
+
+<section class="panel">
+  <div class="grid grid-3">
+    <a class="flex gap-2" href="/market/items/{{ workspace.selected_name|urlencode if workspace.selected_name else '' }}" style="padding:12px;border:1px solid var(--border);border-radius:var(--r);font-size:13px">
+      <strong>查看详情行情</strong><span class="sub">总览 · 平台 · 历史 · 技术指标</span>
+    </a>
+    <a class="flex gap-2" href="/research/rankings" style="padding:12px;border:1px solid var(--border);border-radius:var(--r);font-size:13px">
+      <strong>比较市场榜单</strong><span class="sub">热度 · 涨幅 · 导购挂单</span>
+    </a>
+    <a class="flex gap-2" href="/assets/inventory" style="padding:12px;border:1px solid var(--border);border-radius:var(--r);font-size:13px">
+      <strong>查看库存工作区</strong><span class="sub">需有库存快照才能估值</span>
+    </a>
+  </div>
+</section>
+
+<script id="diy-data" type="application/json">{{ workspace|tojson }}</script>
+{% endblock %}

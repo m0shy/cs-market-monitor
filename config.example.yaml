@@ -1,0 +1,62 @@
+api:
+  base_url: "https://<行情站A域名>"
+  token: ""
+  timeout: 30
+
+siteb_open:
+  base_url: "https://<行情站B域名>"
+  api_key: ""
+  # api_keys: ["key1", "key2"]  # 多账号轮换，个人 key 配额约 60/min
+
+siteb_site:
+  page_size: 500  # 市场目录游标页容量，范围 50-500
+  delay: 0.7      # 公开页面数据接口请求间隔（秒）
+
+crawler:
+  output_dir: "../data/crawler"
+  days: 0  # 0 = 全量历史（type-trend typeDay=7 / K线翻页到 API 耗尽），>0 = 仅最近 N 天
+  request_delay: 1.2
+  browser_headless: true
+  max_browser_pages: 20
+
+proxy:
+  url: ""  # 例如 "http://127.0.0.1:7890"；留空 = 直连（会暴露本机出口 IP）
+
+runtime:
+  routes:
+    siteb_open_api: ["direct"]
+    siteb_site_api: ["direct", "http://127.0.0.1:7890"]
+    siteb_browser: ["direct", "http://127.0.0.1:7890"]
+    sitea_public: ["direct", "http://127.0.0.1:7890"]
+    fallbacks: ["direct", "http://127.0.0.1:7890"]
+  health_check:
+    timeout_seconds: 5
+    failure_threshold: 2
+    cooldown_seconds: 600
+    cache_seconds: 300
+  supervisor:
+    max_parallel: 2
+    heartbeat_seconds: 15
+    lease_seconds: 90
+    lanes:
+      siteb_site_fast: 1
+      siteb_site_bulk: 1
+      siteb_open: 1
+      sitea: 1
+      public_pages: 1
+      maintenance: 1
+      local: 1
+
+
+# 持续增量更新：热门 1h / 冷门 5h 轮询 行情站B open API 快照
+# 平台画像：导购+倒余额为重点（悠悠有品、C5、Steam、HaloSkins），部分平台仅作参考价源
+incremental:
+  hot_interval_hours: 1
+  cold_interval_hours: 5
+  hot_tx_threshold: 5      # 近 24h 成交 >= 5 视为热门
+  broker_platforms: ["youpin", "c5", "steam", "haloskins"]  # 导购/倒余额重点平台
+  hot_broker_sell_threshold: 700   # 导购平台挂单合计 >= 700 热门
+  hot_broker_single_threshold: 400 # 任一导购平台挂单 >= 400 热门
+  hot_buff_sell_threshold: 800     # buff 仅作高门槛参考价源；0=完全不看
+  rate_per_minute: 55     # 单 key 安全速率（price/single 配额 ~60/min）
+  fetch_avg_for_hot: true # 热门附带 7 日均价；冷门仅价格快照

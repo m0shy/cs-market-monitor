@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "csgo-monitor"
+version = "1.0.0"
+description = "CS2 market data framework (supervisor/storage/indicators/web; site adapters stubbed)"
+requires-python = ">=3.11"
+dependencies = [
+  "playwright>=1.45",
+  "PyYAML>=6.0",
+  "requests>=2.31",
+  "websocket-client>=1.7",
+]
+
+[project.scripts]
+csgo-monitor = "csgo_monitor.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

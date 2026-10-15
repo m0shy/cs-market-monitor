@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}我的收藏 · CS2 Market Desk{% endblock %}
+{% block content %}
+
+<nav class="breadcrumb" aria-label="面包屑">
+  <a href="/assets/inventory">库存工作区</a><span>/</span><span>我的收藏</span>
+</nav>
+
+<header class="page-head">
+  <div>
+    <div class="eyebrow">Assets / Collection</div>
+    <h1>我的收藏</h1>
+    <p class="sub">沿用 行情站B 的收藏夹父子关系，登录态数据与公开市场参考分开呈现</p>
+  </div>
+  <div class="flex gap-2">
+    <span class="chip">需要登录</span>
+    <a class="btn" href="/assets/inventory">库存覆盖</a>
+    <a class="btn primary" href="/market/items">浏览市场</a>
+  </div>
+</header>
+
+<section class="panel flex-between" style="margin-bottom:12px">
+  <div class="flex gap-3">
+    <span style="font-size:24px">🔒</span>
+    <div>
+      <div class="eyebrow">Private workspace</div>
+      <h2 style="font-size:15px;font-weight:600">登录后同步收藏夹与库存</h2>
+      <p class="sub">{{ workspace.message }}</p>
+    </div>
+  </div>
+  <button class="btn primary" type="button" disabled>登录入口待接入</button>
+</section>
+
+<section class="grid grid-3" style="margin-bottom:12px">
+  <article class="metric-card">
+    <span class="metric-label">收藏夹 <span class="tag warn">未登录</span></span>
+    <span class="metric-value" style="font-size:30px">{{ workspace.folders|length }}</span>
+    <span class="metric-sub">个 · 需要用户授权</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">公开参考 <span class="tag info">可用</span></span>
+    <span class="metric-value" style="font-size:30px">{{ workspace.references|length }}</span>
+    <span class="metric-sub">件 · 来自当前市场热度榜</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">数据边界 <span class="tag flat">本地</span></span>
+    <span class="metric-value" style="font-size:30px">分离</span>
+    <span class="metric-sub">持仓数据不会由公开报价代替</span>
+  </article>
+</section>
+
+<section class="grid grid-2">
+  <section class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><h2>收藏夹</h2><span class="sub">登录后显示用户文件夹</span></div>
+    </div>
+    <div class="empty-state">
+      <strong>暂无可见收藏夹</strong>
+      <p>收藏卡片将展示：名称 + 总值 + 今日涨跌 + 热度。</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><h2>公开市场参考</h2><span class="sub">不依赖登录即可查看</span></div>
+      <a class="btn sm" href="/research/rankings">查看榜单</a>
+    </div>
+    <div class="table-scroll" style="max-height:420px">
+      <table class="data-table">
+        <thead><tr><th>饰品</th><th class="num">BUFF</th><th class="num">今日偏离</th><th>更新时间</th></tr></thead>
+        <tbody>
+          {% for r in workspace.references %}
+          <tr>
+            <td>
+              <a class="flex gap-2" href="/market/items/{{ r.name|urlencode }}?from=/assets/collection">
+                {% if r.profile.get('image_url') %}<img src="/api/image?url={{ r.profile.get('image_url')|urlencode }}" alt="" loading="lazy" style="width:32px;height:24px;object-fit:contain;flex:none">{% endif %}
+                <span><strong>{{ r.name }}</strong><br><span class="sub">{{ r.profile.get('rarity') or 'CS2 饰品' }}</span></span>
+              </a>
+            </td>
+            <td class="num" style="font-weight:600">{{ "%.2f"|format(r.price) if r.price is not none else '-' }}</td>
+            <td class="num {{ 'up' if (r.diff or 0) >= 0 else 'down' }}">{{ "%+.2f%%"|format(r.diff) if r.diff is not none else '-' }}</td>
+            <td class="muted"><span class="reltime" data-ts="{{ r.ts }}">{{ r.ts[:16] if r.ts else '-' }}</span></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="empty">暂无市场参考</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}

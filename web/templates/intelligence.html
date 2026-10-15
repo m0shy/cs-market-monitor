@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}市场情报 · CS2 Market Desk{% endblock %}
+{% block content %}
+
+{# —— 情报页紧凑三段布局（terminal.css 之外的模板级补充，仅本页生效） —— #}
+<style>
+  .intel-hero{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden}
+  .intel-hero>div{padding:16px 20px;display:flex;flex-direction:column;gap:4px;min-width:0}
+  .intel-hero-label{font-size:11px;color:var(--text-3);letter-spacing:.05em;text-transform:uppercase}
+  .intel-stage-badge{display:inline-block;align-self:flex-start;padding:3px 12px;border:1px solid var(--border-hi);border-radius:var(--r-sm);font-size:20px;font-weight:700;line-height:1.3}
+  .intel-hero strong{font-family:var(--mono);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text);line-height:1.2}
+  .intel-hero-divider{border-left:1px solid var(--border)}
+  @media(max-width:768px){.intel-hero{grid-template-columns:1fr}.intel-hero-divider{border-left:none;border-top:1px solid var(--border)}}
+  .intel-risk{margin-bottom:12px;padding:10px 14px;border:1px solid rgba(255,176,32,.4);background:var(--warn-soft);border-radius:var(--r);color:var(--warn);font-size:13px}
+  .intel-columns{display:grid;grid-template-columns:1.1fr .9fr;gap:12px;align-items:start}
+  @media(max-width:900px){.intel-columns{grid-template-columns:1fr}}
+  .intel-right-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+  .intel-cycle-bar{display:flex;gap:4px;margin-bottom:12px}
+  .intel-cycle-step{flex:1;padding:6px 0;text-align:center;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;color:var(--text-3);transition:all var(--t-fast)}
+  .intel-cycle-step.active{border-color:var(--accent-border);background:var(--accent-soft);color:var(--accent);font-weight:700}
+  .intel-ind-rows{display:flex;flex-direction:column}
+  .intel-ind-row{display:grid;grid-template-columns:1fr auto 24px;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .intel-ind-row:last-child{border-bottom:none}
+  .ind-label{color:var(--text-2)}
+  .ind-val{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+  .ind-status{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font-size:11px;font-weight:700}
+  .ind-status.met{color:var(--up);background:var(--up-soft)}
+  .ind-status.not-met{color:var(--down);background:var(--down-soft)}
+  .ind-status.unknown{color:var(--text-3);background:var(--surface-active)}
+  .intel-details{margin-top:10px;border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 12px;font-size:12px}
+  .intel-details summary{cursor:pointer;color:var(--text-2);font-weight:600}
+  .intel-hint-list{margin:8px 0 0 16px;color:var(--text-3);display:flex;flex-direction:column;gap:4px}
+  .intel-gauge-bar{position:relative;height:10px;border-radius:5px;background:var(--surface-active);overflow:hidden;margin:10px 0 6px}
+  .intel-gauge-fill{height:100%;width:0;border-radius:5px;background:var(--down);transition:width .4s ease}
+  .intel-gauge-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--text-3);margin-bottom:8px}
+  .intel-supp-kvs{display:flex;flex-direction:column}
+  .intel-supp-kv{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px}
+  .intel-supp-kv:last-child{border-bottom:none}
+  .intel-supp-kv span{color:var(--text-3)}
+  .intel-supp-kv strong{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+  .intel-event-list{display:flex;flex-direction:column;gap:2px;max-height:280px;overflow-y:auto}
+  .intel-ev-section-title{font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;padding:8px 0 4px}
+  .intel-ev-item{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12px;color:var(--text-2)}
+  .intel-ev-item .ev-date{flex:none;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:11px;color:var(--text-3);width:44px}
+  .intel-ev-item.upcoming .ev-date{color:var(--accent)}
+  .intel-exec-card{display:flex;flex-direction:column;gap:6px;padding:14px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r)}
+  .intel-exec-card strong{font-size:13px;color:var(--text)}
+  .intel-exec-card .exec-icon{font-size:16px}
+  .intel-exec-card em{font-style:normal;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:15px;color:var(--text)}
+  .intel-exec-card em.up{color:var(--up)}
+  .intel-exec-card em.down{color:var(--down)}
+  .intel-tag{display:inline-block;padding:1px 7px;margin:2px 4px 0 0;border-radius:4px;background:var(--surface-active);color:var(--text-2);font-size:10px}
+  .intel-history-wrap{margin-bottom:12px}
+  #intel-history-chart{height:220px}
+</style>
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Research / Intelligence</span>
+    <h1>市场情报</h1>
+  </div>
+  <div class="flex">
+    <span class="sub num" id="intel-time">—</span>
+    <button class="btn sm" id="intel-refresh" type="button">刷新</button>
+  </div>
+</header>
+
+<!-- 顶部状态条：一行看完市场 -->
+<div class="intel-hero" id="intel-hero">
+  <div class="intel-hero-stage" id="intel-hero-stage">
+    <span class="intel-hero-label">情绪阶段</span>
+    <strong class="intel-stage-badge" id="intel-stage">—</strong>
+    <span class="sub" id="intel-stage-conf">—</span>
+  </div>
+  <div class="intel-hero-divider"></div>
+  <div class="intel-hero-supply">
+    <span class="intel-hero-label">供给状态</span>
+    <strong id="intel-supply-score">—</strong>
+    <span class="sub" id="intel-supply-gap">—</span>
+  </div>
+  <div class="intel-hero-divider"></div>
+  <div class="intel-hero-action">
+    <span class="intel-hero-label">操作参考</span>
+    <strong id="intel-action">—</strong>
+    <span class="sub">描述性分析 · 非交易建议</span>
+  </div>
+</div>
+<div class="intel-risk hidden" id="intel-risk"></div>
+
+<!-- 左右两列 -->
+<div class="intel-columns">
+
+  <!-- 左列：情绪周期 -->
+  <section class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><h2>情绪周期</h2><span class="sub num" id="intel-sent-asof">—</span></div>
+    </div>
+    <div class="intel-cycle-bar" id="intel-cycle-bar">
+      <span class="intel-cycle-step" data-stage="狂热">狂热</span>
+      <span class="intel-cycle-step" data-stage="恐慌">恐慌</span>
+      <span class="intel-cycle-step" data-stage="出清">出清</span>
+      <span class="intel-cycle-step" data-stage="冷漠">冷漠</span>
+      <span class="intel-cycle-step" data-stage="萌芽">萌芽</span>
+    </div>
+    <div class="intel-history-wrap">
+      <div id="intel-history-chart" role="img" aria-label="情绪周期历史轨迹图"></div>
+      <p class="sub" id="intel-history-note" style="margin-top:4px">阶段色带 + 置信度曲线 + 大盘指数（近 90 天）</p>
+    </div>
+    <div class="intel-ind-rows" id="intel-ind-rows">
+      <p class="empty">加载中…</p>
+    </div>
+    <details class="intel-details" id="intel-hints-wrap" style="display:none">
+      <summary>阶段转移提示</summary>
+      <ul class="intel-hint-list" id="intel-hints"></ul>
+    </details>
+  </section>
+
+  <!-- 右列：供给 + 事件 -->
+  <div class="intel-right-col">
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><h2>供给耗竭</h2><span class="sub num" id="intel-supp-asof">—</span></div>
+      </div>
+      <div class="intel-gauge-wrap">
+        <div class="intel-gauge-bar"><div class="intel-gauge-fill" id="intel-gauge-fill"></div></div>
+        <div class="intel-gauge-labels"><span>0 宽裕</span><span>0.5 均衡</span><span>1 耗竭</span></div>
+      </div>
+      <div class="intel-supp-kvs" id="intel-supp-kvs">
+        <p class="empty">加载中…</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><h2>近期事件</h2></div>
+      </div>
+      <div class="intel-event-list" id="intel-events">
+        <p class="empty">加载中…</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- 底部：执行指标（一行三卡） -->
+<section class="panel">
+  <div class="panel-head">
+    <div class="panel-title"><h2>执行参考</h2><span class="sub num" id="intel-exec-asof">—</span></div>
+  </div>
+  <div class="grid grid-3" id="intel-exec-cards">
+    <p class="empty">加载中…</p>
+  </div>
+</section>
+
+{% endblock %}
+{% block scripts %}
+<script defer src="/static/echarts.min.js"></script>
+<script defer src="/static/intelligence.js?v={{ cache_bust if cache_bust is defined else '' }}"></script>
+{% endblock %}

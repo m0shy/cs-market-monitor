@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% from "components/data_status.html" import status_line %}
+{% block title %}{{ item.market_hash_name if item else '未找到' }} · CS2 Market Desk{% endblock %}
+{% block content %}
+{% if not item %}
+<section class="empty-page">
+  <div class="empty-state">
+    <i data-lucide="search-x" aria-hidden="true"></i>
+    <strong>未找到这件饰品</strong>
+    <span>数据库中不存在：{{ missing }}</span>
+    <a class="btn primary" href="/market/items"><i data-lucide="arrow-left" aria-hidden="true"></i>返回饰品市场</a>
+  </div>
+</section>
+{% else %}
+<nav class="crumb" aria-label="面包屑">
+  <a href="{{ return_to }}"><i data-lucide="arrow-left" aria-hidden="true"></i>{{ return_label }}</a>
+  <span class="sep">/</span>
+  <span>{{ parent_title }}</span>
+  <span class="sep">/</span>
+  <span aria-current="page">{{ profile.get('market_short_name') or item.market_hash_name }}</span>
+</nav>
+
+<section class="item-hero">
+  <div class="item-visual">
+    <div class="item-art" style="--rarity-color:{{ profile.get('rarity_color', '#4d8dff') }}">
+      {% if profile.get('image_url') %}
+      <img src="/api/image?url={{ profile.get('image_url')|urlencode }}" alt="{{ item.market_hash_name }}">
+      {% else %}
+      <i data-lucide="package" aria-hidden="true"></i>
+      {% endif %}
+    </div>
+  </div>
+  <div class="item-identity">
+    <div class="item-badges">
+      {% if profile.get('item_type_label') %}<span class="badge badge-other">{{ profile.get('item_type_label') }}</span>{% endif %}
+      {% if profile.get('rarity') %}<span class="badge badge-secondary"><i class="rarity-mark" style="background:{{ profile.get('rarity_color', '#808793') }}"></i>{{ profile.get('rarity') }}</span>{% endif %}
+      {% if profile.get('exterior') %}<span class="badge badge-special">{{ profile.get('exterior') }}</span>{% endif %}
+    </div>
+    <span class="eyebrow">Asset detail</span>
+    <h1>{{ profile.get('market_short_name') or item.market_hash_name }}</h1>
+    <p>{{ item.market_hash_name }}</p>
+    <div class="item-quote">
+      <div>
+        <span>最新收盘</span>
+        <strong><small>¥</small><span id="hero-price">{{ "%.2f"|format(kline_last.close) if kline_last else '-' }}</span></strong>
+      </div>
+      <div id="hero-diff" class="quote-change"><span>今日</span><b id="hero-diff-value">-</b></div>
+      <div class="quote-time"><span>数据日期</span><b>{{ kline_last.ts[:10] if kline_last else '-' }}</b></div>
+    </div>
+    <div class="item-actions"><a class="btn sm" href="/monitor/item-tracking?q={{ item.market_hash_name|urlencode }}"><i data-lucide="radar" aria-hidden="true"></i>追踪异动</a>
+      <a class="btn sm" href="/market/compare"><i data-lucide="between-horizontal-start" aria-hidden="true"></i>跨平台比较</a></div>
+  </div>
+  <div class="item-facts">
+    <div><span>存世量</span><b>{{ "{:,}".format(profile.get('survive_num')|int) if profile.get('survive_num') is not none else '-' }}</b></div>
+    <div><span>持有人</span><b>{{ "{:,}".format(profile.get('holders_num')|int) if profile.get('holders_num') is not none else '-' }}</b></div>
+    <div><span>覆盖平台</span><b>{{ platforms|length }}</b></div>
+    <div><span>K 线状态</span><b id="kline-hint">加载中…</b></div>
+  </div>
+</section>
+{{ status_line('行情站B 公开日 K / 平台快照', kline_last.ts if kline_last else none, 'partial' if not history else 'ready', '历史买卖序列与平台报价分别标注时间；详情覆盖状态见下方') }}
+
+{% if siblings and siblings|length > 1 %}
+<section class="variant-strip">
+  <div class="variant-label"><span>磨损与版本</span><small>{{ siblings|length }} 个可用标的</small></div>
+  <div class="variant-list">
+    {% for sibling in siblings %}
+    <a class="variant-item {{ 'active' if sibling.active else '' }}" href="/market/items/{{ sibling.name|urlencode }}?from={{ return_to|urlencode }}">
+      <span class="variant-thumb">
+        {% if sibling.profile.get('image_url') %}<img src="/api/image?url={{ sibling.profile.get('image_url')|urlencode }}" alt="" loading="lazy">{% else %}<i data-lucide="package" aria-hidden="true"></i>{% endif %}
+      </span>
+      <span><strong>{{ sibling.profile.get('exterior') or sibling.name|wear }}</strong><small>{{ sibling.profile.get('rarity') or '同系列' }}</small></span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="item-summary-bar" id="item-summary-bar" aria-label="详情快捷导航">
+  <div class="summary-quote"><span>最新价</span><b><small>¥</small><span id="sbar-price">{{ "%.2f"|format(kline_last.close) if kline_last else '-' }}</span></b></div>
+  <div class="summary-quote"><span>今日涨跌</span><b id="sbar-diff">-</b></div>
+  <div class="summary-nav">
+    <button class="btn sm" data-tab-jump="kline"><i data-lucide="chart-candlestick" aria-hidden="true"></i>K 线</button>
+    <button class="btn sm" data-tab-jump="platform"><i data-lucide="store" aria-hidden="true"></i>平台</button>
+    <button class="btn sm" data-tab-jump="history"><i data-lucide="history" aria-hidden="true"></i>历史</button>
+    <button class="btn sm" id="summary-indicator-trigger" data-tab-jump="kline"><i data-lucide="sigma" aria-hidden="true"></i>指标</button>
+  </div>
+  <span class="summary-time">更新 <b id="sbar-time">{{ kline_last.ts[:10] if kline_last else '-' }}</b></span>
+</section>
+
+<section class="data-health-bar" id="item-data-health" aria-label="数据可用性" aria-live="polite">
+  <div class="data-health-title">
+    <i data-lucide="database" aria-hidden="true"></i>
+    <span><strong>数据可用性</strong><small id="data-health-summary">正在核对本地采集结果</small></span>
+  </div>
+  <div class="data-health-items">
+    <span class="data-health-item checking" id="health-kline"><b>日 K</b><small>检测中</small></span>
+    <span class="data-health-item checking" id="health-platform"><b>平台报价</b><small>检测中</small></span>
+    <span class="data-health-item checking" id="health-history"><b>站点历史</b><small>检测中</small></span>
+  </div>
+</section>
+
+<div class="item-workspace">
+  <section class="panel item-main-panel">
+    <div class="tab-bar" role="tablist" aria-label="饰品数据视图">
+      <button id="item-tab-kline" class="tab active" data-tab="kline" role="tab" aria-selected="true" aria-controls="tab-kline">价格走势</button>
+      <button id="item-tab-platform" class="tab" data-tab="platform" role="tab" aria-selected="false" aria-controls="tab-platform">平台报价</button>
+      <button id="item-tab-history" class="tab" data-tab="history" role="tab" aria-selected="false" aria-controls="tab-history">历史价格</button>
+      <button id="item-tab-change" class="tab" data-tab="change" role="tab" aria-selected="false" aria-controls="tab-change">异动记录</button>
+      {% if styles %}<button id="item-tab-styles" class="tab" data-tab="styles" role="tab" aria-selected="false" aria-controls="tab-styles">特殊款式 <span class="tab-count">{{ styles|length }}</span></button>{% endif %}
+    </div>
+
+    <div class="tab-pane active" id="tab-kline" role="tabpanel" aria-labelledby="item-tab-kline" aria-hidden="false">
+      <div class="chart-commandbar">
+        <div class="chart-command-scroll">
+          <div class="v3-seg" id="kline-period" role="tablist" aria-label="K 线周期">
+            <button class="active" data-period="day" role="tab" aria-selected="true" aria-controls="item-kline-chart">日 K</button>
+            <button data-period="week" role="tab" aria-selected="false" aria-controls="item-kline-chart">周 K</button>
+            <button data-period="hour" role="tab" aria-selected="false" aria-controls="item-kline-chart">时 K</button>
+          </div>
+          <div class="chart-menu-wrap">
+            <button class="chart-command" id="chart-source-trigger" type="button" aria-haspopup="menu" aria-expanded="false">
+              <i data-lucide="database" aria-hidden="true"></i>
+              <span id="chart-source-label">总览</span>
+              <i data-lucide="chevron-down" aria-hidden="true"></i>
+            </button>
+            <div class="chart-popover source-popover hidden" id="chart-source-menu" role="menu" aria-label="图表数据源">
+              <div class="popover-head"><strong>数据源</strong><span>切换会替换主图数据</span></div>
+              <div id="chart-source-options" class="source-options">
+                <button type="button" class="active" data-chart-source="all" aria-pressed="true"><span><b>总览</b><small>真实 OHLC 与成交量</small></span><em>读取中</em></button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-menu-wrap">
+            <button class="chart-command" id="chart-indicator-trigger" type="button" aria-haspopup="dialog" aria-expanded="false">
+              <i data-lucide="chart-no-axes-combined" aria-hidden="true"></i>
+              <span>指标</span>
+              <span class="command-count" id="indicator-count">2</span>
+            </button>
+            <div class="chart-popover indicator-popover hidden" id="chart-indicator-panel" role="dialog" aria-label="技术指标">
+              <div class="popover-head">
+                <span><strong>技术指标</strong><small>主图叠加，副图最多同时显示 2 个</small></span>
+                <button class="icon-btn compact" id="indicator-close" type="button" aria-label="关闭指标面板"><i data-lucide="x" aria-hidden="true"></i></button>
+              </div>
+              <div class="indicator-columns">
+                <fieldset>
+                  <legend>主图指标</legend>
+                  <label><input type="checkbox" data-main-indicator="ma" checked><span><b>MA</b><small>移动平均线 5 / 10 / 20</small></span></label>
+                  <label><input type="checkbox" data-main-indicator="ema"><span><b>EMA</b><small>指数移动平均线 12 / 26</small></span></label>
+                  <label><input type="checkbox" data-main-indicator="boll"><span><b>BOLL</b><small>30 日中轨与上下轨</small></span></label>
+                </fieldset>
+                <fieldset>
+                  <legend>副图指标</legend>
+                  <label><input type="checkbox" data-sub-indicator="volume" checked><span><b id="activity-indicator-name">成交量</b><small id="activity-indicator-desc">每日成交量</small></span></label>
+                  <label><input type="checkbox" data-sub-indicator="macd"><span><b>MACD</b><small>DIF / DEA / 柱状动能</small></span></label>
+                  <label><input type="checkbox" data-sub-indicator="rsi"><span><b>RSI</b><small>14 日相对强弱</small></span></label>
+                  <label><input type="checkbox" data-sub-indicator="volatility"><span><b>波动率</b><small>30 日价格离散程度</small></span></label>
+                </fieldset>
+              </div>
+              <div class="popover-actions">
+                <span id="indicator-limit-note">默认组合适合日常观察</span>
+                <button class="btn sm" id="indicator-reset" type="button"><i data-lucide="rotate-ccw" aria-hidden="true"></i>恢复默认</button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-menu-wrap">
+            <button class="chart-command" id="chart-draw-trigger" type="button" aria-haspopup="menu" aria-expanded="false">
+              <i data-lucide="pencil-ruler" aria-hidden="true"></i>
+              <span>画图</span>
+            </button>
+            <div class="chart-popover drawing-popover hidden" id="chart-draw-menu" role="menu" aria-label="画图工具">
+              <div class="popover-head"><strong>画图工具</strong><span id="draw-tool-status">选择工具后在主图点击</span></div>
+              <div class="drawing-tools">
+                <button type="button" data-draw-tool="trend"><i data-lucide="move-diagonal-2" aria-hidden="true"></i><span>趋势线</span></button>
+                <button type="button" data-draw-tool="horizontal"><i data-lucide="minus" aria-hidden="true"></i><span>水平线</span></button>
+                <button type="button" data-draw-tool="vertical"><i data-lucide="move-vertical" aria-hidden="true"></i><span>垂直线</span></button>
+                <button type="button" data-draw-tool="fib"><i data-lucide="chart-spline" aria-hidden="true"></i><span>斐波那契</span></button>
+              </div>
+              <div class="drawing-actions">
+                <button type="button" id="draw-undo"><i data-lucide="undo-2" aria-hidden="true"></i>撤销</button>
+                <button type="button" id="draw-clear" class="danger"><i data-lucide="trash-2" aria-hidden="true"></i>清空</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="chart-context">
+          <span id="chart-source-meta">总览 · 读取中</span>
+          <div class="active-indicators" id="active-indicators" aria-label="当前指标"></div>
+          <div class="chart-command-actions">
+            <button class="icon-btn" type="button" data-chart-action="reset" data-chart-target="item-kline-chart" aria-label="重置缩放" title="重置缩放"><i data-lucide="scan-line" aria-hidden="true"></i></button>
+            <button class="icon-btn" type="button" data-chart-action="export" data-chart-target="item-kline-chart" aria-label="导出图表" title="导出图表"><i data-lucide="download" aria-hidden="true"></i></button>
+            <button class="icon-btn" type="button" data-chart-action="fullscreen" data-chart-target="item-chart-box" aria-label="全屏图表" title="全屏图表"><i data-lucide="maximize-2" aria-hidden="true"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="price-cards" id="price-cards">
+        <div class="price-card"><div class="lbl">今日</div><div class="val" id="pc-day">-</div><div class="chg" id="pc-day-chg">-</div></div>
+        <div class="price-card"><div class="lbl">近 7 日</div><div class="val" id="pc-week">-</div><div class="chg" id="pc-week-chg">-</div></div>
+        <div class="price-card"><div class="lbl">近 30 日</div><div class="val" id="pc-month">-</div><div class="chg" id="pc-month-chg">-</div></div>
+      </div>
+      <div class="chart-box advanced-chart-box" id="item-chart-box">
+        <div id="item-kline-chart" class="chart xl"></div>
+        <svg id="item-drawing-layer" class="drawing-layer" aria-hidden="true"></svg>
+        <div class="drawing-hint hidden" id="drawing-hint">在主图选择第一个点</div>
+        <div class="chart-loading" id="kline-loading">K 线加载中…</div>
+      </div>
+      <div class="pane-empty hidden" id="kline-empty"></div>
+    </div>
+
+    <div class="tab-pane" id="tab-platform" role="tabpanel" aria-labelledby="item-tab-platform" aria-hidden="true">
+      <div class="platform-source-strip" aria-label="图表来源">
+        <button class="platform-source-choice active" type="button" data-chart-source-trigger="all" aria-pressed="true" title="切换到总览 K 线">
+          <span class="source-logo all">∑</span>
+          <span><strong>总览</strong><small>综合 OHLC</small></span>
+          <i data-lucide="chart-candlestick" aria-hidden="true"></i>
+        </button>
+        <span class="platform-source-strip-label" id="platform-source-strip-label">当前图表：总览</span>
+      </div>
+      <div class="platform-grid" id="platform-grid">
+        {% for p, m in platforms|dictsort %}
+        {% set a = avg.get(p) %}
+        {% set diff = ((m.get('sell_price') - a) / a * 100) if (m.get('sell_price') and a) else none %}
+        <article class="platform-card" data-platform="{{ p }}" data-platform-source="{{ p }}" data-chart-source-trigger="{{ p }}" role="button" tabindex="0" aria-pressed="false" title="切换到 {{ p|upper }} 历史价格">
+          <div class="phead">
+            <span class="platform-name"><i data-lucide="store" aria-hidden="true"></i>{{ p }}</span>
+            <span class="platform-card-action" aria-hidden="true"><i data-lucide="chart-line" aria-hidden="true"></i></span>
+            <span class="reltime" data-ts="{{ m.get('updated_at') }}">{{ (m.get('updated_at') or '')[:16] }}</span>
+          </div>
+          <div class="price"><span class="cur">¥</span>{{ "%.2f"|format(m.get('sell_price')) if m.get('sell_price') is not none else '-' }}</div>
+          <div class="platform-depth">
+            <span>在售<b>{{ "{:,}".format(m.get('sell_num')|int) if m.get('sell_num') is not none else '-' }}</b></span>
+            <span>求购价<b>{{ "%.2f"|format(m.get('buy_price')) if m.get('buy_price') is not none else '-' }}</b></span>
+            <span>求购量<b>{{ m.get('buy_num')|int if m.get('buy_num') is not none else '-' }}</b></span>
+          </div>
+          <div class="vs">
+            <span class="muted">7 日均价 ¥{{ "%.2f"|format(a) if a else '-' }}</span>
+            {% if diff is not none %}<span class="chip-num {{ 'up' if diff >= 0 else 'down' }}">{{ "%+.2f%%"|format(diff) }}</span>{% endif %}
+          </div>
+        </article>
+        {% else %}
+        <div class="empty-state compact"><i data-lucide="store" aria-hidden="true"></i><strong>暂无平台报价</strong></div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="tab-pane" id="tab-history" role="tabpanel" aria-labelledby="item-tab-history" aria-hidden="true">
+      <div class="data-source-note hidden" id="history-source-note"></div>
+      <div class="chart-box">
+        <div id="item-history-chart" class="chart xl"></div>
+        <div class="chart-loading hidden">历史价格加载中…</div>
+      </div>
+      <div class="pane-empty hidden" id="history-empty">历史价格仍在采集中</div>
+    </div>
+
+    <div class="tab-pane" id="tab-change" role="tabpanel" aria-labelledby="item-tab-change" aria-hidden="true">
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr><th>平台</th><th>指标</th><th class="num">原值</th><th class="num">新值</th><th class="num">变化</th><th>时间</th></tr></thead>
+          <tbody id="change-body"><tr><td colspan="6" class="muted">加载中…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tab-pane" id="tab-styles" role="tabpanel" aria-labelledby="item-tab-styles" aria-hidden="true">
+      <div class="chart-toolbar">
+        <label class="inline-select"><span>特殊款式</span><select id="style-select" aria-label="选择特殊款式">{% for s in styles %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></label>
+        <span class="muted">相位、宝石与档位按独立行情展示</span>
+      </div>
+      <div class="chart-box">
+        <div id="style-kline-chart" class="chart xl"></div>
+        <div class="chart-loading hidden">款式行情加载中…</div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="item-sidebar">
+    <section class="panel sticky-panel">
+      <div class="panel-head">
+        <div class="panel-title"><div class="section-icon"><i data-lucide="store" aria-hidden="true"></i></div><div><h2>平台快照</h2><span class="sub">{{ platforms|length }} 个来源</span></div></div>
+      </div>
+      <div class="quote-list">
+        {% for p, m in platforms|dictsort %}
+        <div data-platform-summary="{{ p }}">
+          <span><strong>{{ p }}</strong><small>{{ platform_role(p)[0] }}</small></span>
+          <span><b>¥{{ "%.2f"|format(m.get('sell_price')) if m.get('sell_price') is not none else '-' }}</b><small>在售 {{ "{:,}".format(m.get('sell_num')|int) if m.get('sell_num') is not none else '-' }}</small></span>
+        </div>
+        {% else %}
+        <div class="empty-state compact"><span>暂无报价</span></div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><div class="section-icon"><i data-lucide="database" aria-hidden="true"></i></div><div><h2>标的资料</h2><span class="sub">采集元数据</span></div></div>
+      </div>
+      <dl class="asset-meta">
+        <div><dt>市场短名</dt><dd>{{ profile.get('market_short_name') or '-' }}</dd></div>
+        <div><dt>品质</dt><dd>{{ profile.get('quality') or '-' }}</dd></div>
+        <div><dt>成交次数</dt><dd>{{ profile.get('transaction_count') or '-' }}</dd></div>
+        <div><dt>换手率</dt><dd>{{ profile.get('turnover_rate') or '-' }}</dd></div>
+        <div><dt>量比</dt><dd>{{ profile.get('volume_ratio') or '-' }}</dd></div>
+      </dl>
+      {% if profile.get('analysis_tags') %}
+      <div class="analysis-tags">
+        {% for tag in profile.get('analysis_tags') %}<span title="{{ tag.description }}">{{ tag.label }}</span>{% endfor %}
+      </div>
+      {% endif %}
+    </section>
+    <section class="panel">
+      <div class="panel-head"><div class="panel-title"><h2>来源与覆盖</h2></div></div>
+      <dl class="asset-meta">
+        <div><dt>目录</dt><dd>行情站B 公开目录</dd></div>
+        <div><dt>平台报价</dt><dd>{{ platforms|length }} 个平台快照</dd></div>
+        <div><dt>站点历史</dt><dd>{{ history|length }} 条{% if not history %} · 回填中{% endif %}</dd></div>
+        <div><dt>K 线日期</dt><dd>{{ kline_last.ts[:10] if kline_last else '尚未采集' }}</dd></div>
+      </dl>
+      <a class="btn sm" href="/data/coverage">采集进度<i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
+    </section>
+  </aside>
+</div>
+{% endif %}
+{% endblock %}

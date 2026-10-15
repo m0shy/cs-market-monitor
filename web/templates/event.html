@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}事件详情 · CS2 Market Desk{% endblock %}
+{% block content %}
+
+<nav class="breadcrumb" aria-label="面包屑">
+  <a href="{{ return_to }}">返回监控列表</a><span>/</span><span>事件详情</span>
+</nav>
+
+{% if event %}
+<header class="page-head">
+  <div>
+    <div class="eyebrow">Monitor / Event</div>
+    <h1>{{ event.name }}</h1>
+    <p class="sub"><span class="chip">{{ event.platform|upper }}</span> · {{ {'sell_price':'在售价','buy_price':'求购价','sell_num':'在售量','buy_num':'求购量'}.get(event.metric, event.metric) }} · <span class="num">{{ event.ts[:16] }}</span></p>
+  </div>
+  <a class="btn primary" href="/market/items/{{ event.name|urlencode }}?from={{ request.url.path|urlencode }}">查看饰品行情</a>
+</header>
+
+{% set ev_status = freshness_status(event.ts, 'ready') %}
+<div class="flex-wrap" style="gap:8px;font-size:12px;color:var(--text-3);margin-bottom:12px">
+  <span class="tag info">行情站B 异动记录</span>
+  <span class="tag {{ 'down' if ev_status == 'ready' else 'warn' }}">{{ {'ready': '可用', 'partial': '部分覆盖', 'collecting': '采集中', 'stale': '数据过期', 'missing': '尚无数据', 'blocked': '来源受限', 'error': '读取失败'}.get(ev_status, ev_status) }}</span>
+  <span class="num">更新 {{ market_time_label(event.ts) }}（北京时间）</span>
+  <span>与上一次快照比较；不表示持续趋势</span>
+  <a href="/data/coverage">覆盖详情</a>
+</div>
+
+<section class="panel" aria-label="触发证据">
+  <div class="panel-head">
+    <div class="panel-title"><h2>触发证据</h2><span class="sub">相邻两次快照对比</span></div>
+    <span class="tag {{ 'up' if event.ratio >= 0 else 'down' }}">{{ '上涨' if event.ratio >= 0 else '下跌' }}</span>
+  </div>
+  <div class="grid grid-3">
+    <div class="metric-card">
+      <span class="metric-label">原值</span>
+      <span class="metric-value muted" style="font-size:28px">{{ '¥%.2f'|format(event.old) if event.metric in ['sell_price','buy_price'] else '{:,}'.format(event.old|round|int) }}</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">新值</span>
+      <span class="metric-value {{ 'up' if event.ratio >= 0 else 'down' }}" style="font-size:28px">{{ '¥%.2f'|format(event.new) if event.metric in ['sell_price','buy_price'] else '{:,}'.format(event.new|round|int) }}</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">变化</span>
+      <span class="metric-value {{ 'up' if event.ratio >= 0 else 'down' }}" style="font-size:28px">{{ '%+.2f%%'|format(event.ratio) }}</span>
+    </div>
+  </div>
+  <div class="flex num" style="justify-content:center;gap:24px;font-size:20px;color:var(--text-3);padding:8px 0 0">
+    <span>{{ '¥%.2f'|format(event.old) if event.metric in ['sell_price','buy_price'] else '{:,}'.format(event.old|round|int) }}</span>
+    <span class="{{ 'up' if event.ratio >= 0 else 'down' }}" style="font-weight:700">→</span>
+    <span>{{ '¥%.2f'|format(event.new) if event.metric in ['sell_price','buy_price'] else '{:,}'.format(event.new|round|int) }}</span>
+  </div>
+  <div class="flex gap-2" style="margin-top:12px">
+    <a class="btn" href="{{ return_to }}">返回监控列表</a>
+    <a class="btn ghost" href="/data/sources">了解来源口径</a>
+  </div>
+</section>
+{% else %}
+<section class="panel">
+  <div class="empty-state">
+    <strong>事件已离开近期窗口</strong>
+    <p>雷达只保留当前可查询的近期异动。</p>
+    <a class="btn" href="{{ return_to }}">返回监控列表</a>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

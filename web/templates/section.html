@@ -1,0 +1,375 @@
+{% extends "base.html" %}
+{% block title %}{{ workspace.config.title }} · CS2 Market Desk{% endblock %}
+{% block content %}
+{% set snap = workspace.snap %}
+{% set section_url = '/research/sections?type=' ~ workspace.section_type ~ '&period=' ~ workspace.period %}
+
+{# —— 板块终端组件（terminal.css 之外的模板级补充，仅本页生效） —— #}
+<style>
+  .nav-tabs{display:inline-flex;gap:2px;padding:3px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r);overflow-x:auto;max-width:100%;scrollbar-width:none}
+  .nav-tabs::-webkit-scrollbar{display:none}
+  .nav-tabs a{padding:5px 12px;border-radius:var(--r-sm);font-size:12px;color:var(--text-2);white-space:nowrap}
+  .nav-tabs a:hover{color:var(--text);background:var(--surface-hi)}
+  .nav-tabs a.active{color:#fff;background:var(--accent-soft);font-weight:600}
+  .nav-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .nav-row .nav-label{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text-3);white-space:nowrap}
+  .nav-row .nav-label svg{width:13px;height:13px}
+  .v3-seg{display:inline-flex;gap:2px;padding:2px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r-sm)}
+  .v3-seg button{padding:4px 10px;border-radius:4px;font-size:12px;color:var(--text-3)}
+  .v3-seg button:hover{color:var(--text)}
+  .v3-seg button.active{background:var(--accent);color:#fff;font-weight:600}
+  .index-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px;align-items:start}
+  @media(max-width:1100px){.index-layout{grid-template-columns:1fr}}
+  .snapshot-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  @media(max-width:700px){.snapshot-grid{grid-template-columns:repeat(2,1fr)}}
+  .snap-cell{display:flex;flex-direction:column;gap:2px;padding:10px 12px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r)}
+  .snap-cell span{font-size:11px;color:var(--text-3)}
+  .snap-cell b{font-family:var(--mono);font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+  .snap-cell b.up{color:var(--up)}
+  .snap-cell b.down{color:var(--down)}
+  .chip-num{display:inline-block;min-width:60px;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;font-weight:600}
+  .chip-num.up{color:var(--up)}
+  .chip-num.down{color:var(--down)}
+  .mini-breadth{display:flex;width:100%;height:8px;border-radius:4px;overflow:hidden;background:var(--surface-active)}
+  .mini-breadth i{display:block;min-width:0}
+  .mini-breadth i.up{background:var(--up)}
+  .mini-breadth i.flat{background:var(--flat);opacity:.45}
+  .mini-breadth i.down{background:var(--down)}
+  .chart-commandbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+  .chart-command-scroll{display:flex;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:none;max-width:100%}
+  .chart-command-scroll::-webkit-scrollbar{display:none}
+  .chart-menu-wrap{position:relative}
+  .chart-command{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid var(--border-hi);border-radius:var(--r-sm);background:var(--surface-hi);color:var(--text-2);font-size:12px;white-space:nowrap}
+  .chart-command:hover{color:var(--text);border-color:var(--accent-border)}
+  .chart-command svg{width:13px;height:13px}
+  .command-count{display:inline-grid;place-items:center;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-size:10px;font-weight:700}
+  .chart-command-actions{display:flex;gap:4px}
+  .icon-btn{display:inline-grid;place-items:center;width:28px;height:28px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text-2)}
+  .icon-btn:hover{color:var(--text);border-color:var(--border-hi);background:var(--surface-hi)}
+  .icon-btn svg{width:14px;height:14px}
+  .chart-popover{position:absolute;top:calc(100% + 6px);left:0;z-index:60;min-width:230px;background:var(--bg-raised);border:1px solid var(--border-hi);border-radius:var(--r);box-shadow:var(--shadow-lg);padding:10px}
+  .chart-popover.popover-up{top:auto;bottom:calc(100% + 6px)}
+  .chart-popover.popover-align-right{left:auto;right:0}
+  .popover-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .popover-head strong{font-size:12px;color:var(--text)}
+  .popover-head span,.popover-head small{font-size:11px;color:var(--text-3)}
+  .source-options{display:flex;flex-direction:column;gap:6px}
+  .source-options button{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);text-align:left}
+  .source-options button:hover{border-color:var(--accent-border)}
+  .source-options button.active{border-color:var(--accent-border);background:var(--accent-soft)}
+  .source-options b{display:block;font-size:12px;color:var(--text)}
+  .source-options small{display:block;font-size:11px;color:var(--text-3)}
+  .source-options em{font-style:normal;font-size:10px;color:var(--text-3);white-space:nowrap}
+  .indicator-columns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .indicator-columns fieldset{border:none;display:flex;flex-direction:column;gap:6px}
+  .indicator-columns legend{font-size:10px;color:var(--text-3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:2px}
+  .indicator-columns label{display:flex;align-items:flex-start;gap:7px;font-size:12px;color:var(--text-2);cursor:pointer}
+  .indicator-columns label:hover{color:var(--text)}
+  .indicator-columns input{margin-top:2px;accent-color:var(--accent)}
+  .indicator-columns b{font-weight:600;color:var(--text)}
+  .indicator-columns small{display:block;font-size:10px;color:var(--text-3)}
+  .popover-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px}
+  .popover-actions span{font-size:11px;color:var(--text-3)}
+  .drawing-tools{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .drawing-tools button{display:inline-flex;align-items:center;gap:6px;padding:7px 9px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text-2);font-size:12px}
+  .drawing-tools button:hover{color:var(--text);border-color:var(--accent-border)}
+  .drawing-tools svg{width:13px;height:13px}
+  .drawing-actions{display:flex;gap:6px;margin-top:8px}
+  .drawing-actions button{flex:1;padding:6px;border-radius:var(--r-sm);background:var(--surface);color:var(--text-2);font-size:11px;border:1px solid var(--border)}
+  .drawing-actions button:hover{color:var(--text)}
+  .drawing-actions button.danger{color:var(--danger)}
+  .chart-context{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:var(--text-3);padding:0 2px}
+  .active-indicators{display:flex;gap:4px;flex-wrap:wrap}
+  .active-indicators span{padding:1px 7px;border-radius:10px;background:var(--accent-soft);color:var(--accent);font-size:10px}
+  .chart-box{position:relative}
+  .chart-loading{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(11,14,20,.72);font-size:12px;color:var(--text-2);pointer-events:none}
+  .chart-loading.error{pointer-events:auto}
+  .drawing-layer{position:absolute;inset:0;z-index:4;pointer-events:none}
+  .status-list{display:flex;flex-direction:column}
+  .status-list>div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}
+  .status-list>div:last-child{border-bottom:none}
+  .status-list span{color:var(--text-3)}
+  .status-list b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600;color:var(--text)}
+  .mini-list{display:flex;flex-direction:column}
+  .mini-list>a,.mini-list>div{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px}
+  .mini-list>a:last-child,.mini-list>div:last-child{border-bottom:none}
+  .mini-list>a:hover .mini-name{color:var(--accent)}
+  .rank-num{display:inline-grid;place-items:center;flex:none;min-width:22px;height:22px;padding:0 4px;border-radius:var(--r-sm);font-family:var(--mono);font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;background:var(--surface-active);color:var(--text-2)}
+  .rank-num.r1{background:linear-gradient(135deg,#ffd700,#ffb02e);color:#241a04}
+  .rank-num.r2{background:linear-gradient(135deg,#dfe6f1,#a8b4c6);color:#141a26}
+  .rank-num.r3{background:linear-gradient(135deg,#e8a06a,#cd7f32);color:#241004}
+  .mini-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+  .mini-value{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--text-2)}
+  .mini-change{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px}
+  .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;white-space:nowrap}
+  .badge-other{color:var(--text-2);background:var(--surface-active)}
+  .item-name{color:var(--text);font-size:13px}
+  .item-name:hover{color:var(--accent)}
+  .source-compare{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+  .source-card{display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r)}
+  .source-card:hover{border-color:var(--accent-border)}
+  .source-logo{display:inline-grid;place-items:center;flex:none;width:34px;height:34px;border-radius:var(--r-sm);font-family:var(--mono);font-size:12px;font-weight:700;color:#fff}
+  .source-logo.siteb{background:var(--accent)}
+  .source-logo.sitea{background:var(--gold);color:#241a04}
+  .source-card strong{display:block;font-size:13px;color:var(--text)}
+  .source-card small{display:block;font-size:11px;color:var(--text-3)}
+  .compare-value{margin-left:auto;text-align:right}
+  .compare-value b{display:block;font-family:var(--mono);font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text)}
+  .compare-value small{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .refresh-hint{font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums}
+</style>
+
+<nav class="breadcrumb" aria-label="面包屑">
+  <a href="/research/index"><i data-lucide="arrow-left" aria-hidden="true"></i>市场指数</a>
+  <span>/</span>
+  <span aria-current="page">{{ workspace.config.label }}</span>
+</nav>
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">{{ workspace.config.eyebrow }}</span>
+    <h1>{{ workspace.config.title }}</h1>
+    <p class="sub">{{ workspace.config.description }}</p>
+  </div>
+  <div class="flex">
+    <span class="chip">{{ workspace.section_type }} · {{ workspace.period_label }}</span>
+    <a class="btn primary" href="/market/items"><i data-lucide="scan-search" aria-hidden="true"></i>浏览饰品市场</a>
+  </div>
+</header>
+
+<section class="panel">
+  <div class="nav-row" style="margin-bottom:10px">
+    <span class="nav-label"><i data-lucide="layers-3" aria-hidden="true"></i>板块层级</span>
+    <nav class="nav-tabs" aria-label="板块层级导航">
+      {% for key in ['BROAD', 'HOT', 'LEVEL1', 'LEVEL2', 'LEVEL3'] %}
+      {% set cfg = {'BROAD': '大盘总览', 'HOT': '热门板块', 'LEVEL1': '一级板块', 'LEVEL2': '二级板块', 'LEVEL3': '成分饰品'} %}
+      <a class="{{ 'active' if workspace.section_type == key else '' }}" href="/research/sections?type={{ key }}&period={{ workspace.period }}">{{ cfg[key] }}</a>
+      {% endfor %}
+    </nav>
+  </div>
+  <div class="nav-row">
+    <span class="nav-label"><i data-lucide="clock-3" aria-hidden="true"></i>观察周期</span>
+    <nav class="nav-tabs" aria-label="板块观察周期">
+      {% for period in workspace.periods %}
+      <a class="{{ 'active' if workspace.period == period.key else '' }}" href="/research/sections?type={{ workspace.section_type }}&period={{ period.key }}">{{ period.label }}</a>
+      {% endfor %}
+    </nav>
+  </div>
+</section>
+
+<section class="index-layout">
+  <div>
+    <section class="panel">
+      <div class="flex-between mb-3">
+        <div>
+          <span class="eyebrow">{{ workspace.config.label }}</span>
+          <div class="flex" style="gap:8px">
+            <span class="num" style="font-size:30px;font-weight:700;line-height:1.1">{{ "%.2f"|format(snap.get('value')) if snap.get('value') is not none else '-' }}</span>
+            <span class="chip-num {{ 'up' if (snap.get('change_rate') or 0) >= 0 else 'down' }}" style="font-size:15px">{{ "%+.2f%%"|format(snap.get('change_rate') or 0) }}</span>
+          </div>
+        </div>
+        <span class="sub">更新时间 {{ (snap.get('as_of') or workspace.coverage.snapshot_at or '-')[:16] }}</span>
+      </div>
+      <div class="snapshot-grid">
+        <div class="snap-cell"><span>区间变化</span><b>{{ "%+.2f"|format(snap.get('change')) if snap.get('change') is not none else '-' }}</b></div>
+        <div class="snap-cell"><span>上涨</span><b class="up">{{ workspace.breadth.up }}</b></div>
+        <div class="snap-cell"><span>持平</span><b>{{ workspace.breadth.flat }}</b></div>
+        <div class="snap-cell"><span>下跌</span><b class="down">{{ workspace.breadth.down }}</b></div>
+      </div>
+      <div class="mini-breadth mt-3" aria-hidden="true">
+        {% set total = workspace.breadth.up + workspace.breadth.flat + workspace.breadth.down %}
+        <i class="up" style="width:{{ (workspace.breadth.up / total * 100) if total else 0 }}%"></i>
+        <i class="flat" style="width:{{ (workspace.breadth.flat / total * 100) if total else 100 }}%"></i>
+        <i class="down" style="width:{{ (workspace.breadth.down / total * 100) if total else 0 }}%"></i>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <div><h2>{{ '行情站B 大盘 K 线' if workspace.section_type == 'BROAD' else '板块指数走势' }}</h2><span class="sub" id="section-chart-note">{{ workspace.coverage.history_note }}</span></div>
+        </div>
+        <div class="flex">
+          <span class="refresh-hint">{{ workspace.coverage.constituent_count }} 个成分</span>
+          <a class="icon-btn" href="/research/index?source=siteb&period={{ workspace.period }}" aria-label="打开完整指数工作台" title="打开完整指数工作台"><i data-lucide="maximize-2" aria-hidden="true"></i></a>
+        </div>
+      </div>
+      <div class="chart-commandbar section-chart-commandbar" data-section-type="{{ workspace.section_type }}" data-section-period="{{ workspace.period }}">
+        <div class="chart-command-scroll">
+          <div class="v3-seg" id="section-period" role="tablist" aria-label="板块周期">
+            {% for period in workspace.periods %}
+            <button class="{{ 'active' if workspace.period == period.key else '' }}" data-section-period="{{ period.key }}" role="tab" aria-selected="{{ 'true' if workspace.period == period.key else 'false' }}">{{ period.label }}</button>
+            {% endfor %}
+          </div>
+          <div class="chart-menu-wrap">
+            <button class="chart-command" id="section-source-trigger" type="button" aria-haspopup="menu" aria-expanded="false">
+              <i data-lucide="database" aria-hidden="true"></i><span id="section-source-label">行情站B</span><i data-lucide="chevron-down" aria-hidden="true"></i>
+            </button>
+            <div class="chart-popover source-popover hidden" id="section-source-menu" role="menu" aria-label="板块数据源">
+              <div class="popover-head"><strong>数据源</strong><span>替换板块主图</span></div>
+              <div class="source-options">
+                <button type="button" class="active" data-section-source="siteb" aria-pressed="true"><span><b>行情站B</b><small>板块成分快照时间轴</small></span><em>默认</em></button>
+                <button type="button" data-section-source="sitea" aria-pressed="false"><span><b>行情站A</b><small>大盘来源，板块层级可能暂无独立历史</small></span><em>可切换</em></button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-menu-wrap">
+            <button class="chart-command" id="section-indicator-trigger" type="button" aria-haspopup="dialog" aria-expanded="false">
+              <i data-lucide="chart-no-axes-combined" aria-hidden="true"></i><span>指标</span><span class="command-count" id="section-indicator-count">2</span>
+            </button>
+            <div class="chart-popover indicator-popover hidden" id="section-indicator-panel" role="dialog" aria-label="板块技术指标">
+              <div class="popover-head">
+                <span><strong>技术指标</strong><small>主图叠加，副图最多同时显示 2 个</small></span>
+                <button class="icon-btn" id="section-indicator-close" type="button" aria-label="关闭指标面板"><i data-lucide="x" aria-hidden="true"></i></button>
+              </div>
+              <div class="indicator-columns">
+                <fieldset>
+                  <legend>主图指标</legend>
+                  <label><input type="checkbox" data-section-main="ma" checked><span><b>MA</b><small>移动平均线 5 / 10 / 20</small></span></label>
+                  <label><input type="checkbox" data-section-main="ema"><span><b>EMA</b><small>指数移动平均线 12 / 26</small></span></label>
+                  <label><input type="checkbox" data-section-main="boll"><span><b>BOLL</b><small>30 周期上下轨</small></span></label>
+                </fieldset>
+                <fieldset>
+                  <legend>副图指标</legend>
+                  <label><input type="checkbox" data-section-sub="volume" checked><span><b id="section-activity-name">成分观察数</b><small>当前周期成分快照样本</small></span></label>
+                  <label><input type="checkbox" data-section-sub="macd"><span><b>MACD</b><small>DIF / DEA / 柱状动能</small></span></label>
+                  <label><input type="checkbox" data-section-sub="rsi"><span><b>RSI</b><small>14 周期相对强弱</small></span></label>
+                  <label><input type="checkbox" data-section-sub="volatility"><span><b>波动率</b><small>30 周期价格离散程度</small></span></label>
+                </fieldset>
+              </div>
+              <div class="popover-actions">
+                <span id="section-indicator-note">默认组合适合板块观察</span>
+                <button class="btn sm" id="section-indicator-reset" type="button"><i data-lucide="rotate-ccw" aria-hidden="true"></i>恢复默认</button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-menu-wrap">
+            <button class="chart-command" id="section-draw-trigger" type="button" aria-haspopup="menu" aria-expanded="false">
+              <i data-lucide="pencil-ruler" aria-hidden="true"></i><span>画图</span>
+            </button>
+            <div class="chart-popover drawing-popover hidden" id="section-draw-menu" role="menu" aria-label="板块画图工具">
+              <div class="popover-head"><strong>画图工具</strong><span id="section-draw-status">选择工具后在主图点击</span></div>
+              <div class="drawing-tools">
+                <button type="button" data-section-draw-tool="trend"><i data-lucide="move-diagonal-2" aria-hidden="true"></i><span>趋势线</span></button>
+                <button type="button" data-section-draw-tool="horizontal"><i data-lucide="minus" aria-hidden="true"></i><span>水平线</span></button>
+                <button type="button" data-section-draw-tool="vertical"><i data-lucide="move-vertical" aria-hidden="true"></i><span>垂直线</span></button>
+                <button type="button" data-section-draw-tool="fib"><i data-lucide="chart-spline" aria-hidden="true"></i><span>斐波那契</span></button>
+              </div>
+              <div class="drawing-actions">
+                <button type="button" id="section-draw-undo"><i data-lucide="undo-2" aria-hidden="true"></i>撤销</button>
+                <button type="button" id="section-draw-clear" class="danger"><i data-lucide="trash-2" aria-hidden="true"></i>清空</button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-command-actions">
+            <button class="icon-btn" type="button" data-chart-action="reset" data-chart-target="section-index-chart" aria-label="重置缩放" title="重置缩放"><i data-lucide="scan-line" aria-hidden="true"></i></button>
+            <button class="icon-btn" type="button" data-chart-action="export" data-chart-target="section-index-chart" aria-label="导出图表" title="导出图表"><i data-lucide="download" aria-hidden="true"></i></button>
+            <button class="icon-btn" type="button" data-chart-action="fullscreen" data-chart-target="section-chart-box" aria-label="全屏图表" title="全屏图表"><i data-lucide="maximize-2" aria-hidden="true"></i></button>
+          </div>
+        </div>
+        <div class="chart-context">
+          <span id="section-chart-meta">行情站B · {{ workspace.period_label }}</span>
+          <div class="active-indicators" id="section-active-indicators" aria-label="当前指标"></div>
+        </div>
+      </div>
+      <div class="chart-box" id="section-chart-box">
+        <div id="section-index-chart" style="width:100%;height:480px" role="img" aria-label="板块指数 K 线图"></div>
+        <svg id="section-drawing-layer" class="drawing-layer" aria-hidden="true"></svg>
+        <div class="chart-loading">板块行情加载中…</div>
+      </div>
+    </section>
+  </div>
+
+  <aside>
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><h2>层级状态</h2><span class="sub">当前快照覆盖</span></div>
+      </div>
+      <div class="status-list">
+        <div><span>当前层级</span><b>{{ workspace.config.label }}</b></div>
+        <div><span>成分数量</span><b>{{ workspace.coverage.constituent_count }}</b></div>
+        <div><span>快照状态</span><b class="{{ 'up' if workspace.coverage.snapshot_available else 'down' }}">{{ '已采集' if workspace.coverage.snapshot_available else '待采集' }}</b></div>
+        <div><span>快照时间</span><b>{{ (workspace.coverage.snapshot_at or '-')[:16] }}</b></div>
+      </div>
+      <a class="btn w-full mt-3" href="/data/coverage"><i data-lucide="database-zap" aria-hidden="true"></i>查看采集状态</a>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><h2>{{ workspace.config.sample_label }}</h2><span class="sub">按变化幅度排序</span></div>
+        <a class="icon-btn" href="/research/rankings" aria-label="查看榜单" title="查看榜单"><i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
+      </div>
+      <div class="mini-list">
+        {% for r in workspace.hot[:10] %}
+        {% if r.linkable %}
+        <a href="/market/items/{{ r.name|urlencode }}?from={{ section_url|urlencode }}">
+        {% else %}
+        <div>
+        {% endif %}
+          <span class="rank-num">{{ loop.index }}</span>
+          <span class="mini-name" title="{{ r.name }}">{{ r.name }}</span>
+          <span class="mini-value">{{ "%.2f"|format(r.index) if r.index is not none else '-' }}</span>
+          <span class="mini-change {{ 'up' if (r.change_rate or 0) >= 0 else 'down' }}">{{ "%+.2f%%"|format(r.change_rate) if r.change_rate is not none else '-' }}</span>
+        {% if r.linkable %}
+        </a>
+        {% else %}
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="empty">暂无板块成分快照</div>
+        {% endfor %}
+      </div>
+    </section>
+  </aside>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <div class="panel-title"><h2>成分数据</h2><span class="sub">{{ workspace.coverage.history_note }}</span></div>
+    <span class="refresh-hint">{{ workspace.generated_at[:16] }}</span>
+  </div>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>#</th><th>成分</th><th>层级</th><th class="num">指数</th><th class="num">变化</th><th class="num">变化率</th><th>快照</th></tr></thead>
+      <tbody>
+        {% for r in workspace.rows %}
+        <tr>
+          <td><span class="rank-num">{{ loop.index }}</span></td>
+          <td>
+            {% if r.linkable %}
+            <a class="item-name" href="/market/items/{{ r.name|urlencode }}?from={{ section_url|urlencode }}">{{ r.name }}</a>
+            {% else %}
+            <span class="item-name">{{ r.name }}</span>
+            {% endif %}
+          </td>
+          <td><span class="badge badge-other">{{ r.bucket|replace('List', '')|upper }}</span></td>
+          <td class="num" style="font-weight:600">{{ "%.2f"|format(r.index) if r.index is not none else '-' }}</td>
+          <td class="num">{{ "%+.2f"|format(r.change) if r.change is not none else '-' }}</td>
+          <td class="num"><span class="chip-num {{ 'up' if (r.change_rate or 0) >= 0 else 'down' }}">{{ "%+.2f%%"|format(r.change_rate) if r.change_rate is not none else '-' }}</span></td>
+          <td class="muted">{{ (r.ts or '-')[:16] }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="empty">暂无成分快照</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <div class="panel-title"><h2>来源对照</h2><span class="sub">不同来源独立展示，不混合计算</span></div>
+  </div>
+  <div class="source-compare">
+    {% for key, source in workspace.sources.items() %}
+    <a href="/research/index?source={{ key }}&period={{ workspace.period }}" class="source-card">
+      <span class="source-logo {{ key }}">{{ 'SD' if key == 'siteb' else 'CQ' }}</span>
+      <span><strong>{{ source.get('short_name', key|upper) }}</strong><small>{{ (source.get('as_of') or '-')[:16] }}</small></span>
+      <span class="compare-value"><b>{{ "%.2f"|format(source.get('value')) if source.get('value') is not none else '-' }}</b><small class="{{ 'up' if (source.get('change_rate') or 0) >= 0 else 'down' }}">{{ "%+.2f%%"|format(source.get('change_rate') or 0) }}</small></span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<script id="section-data" type="application/json">{{ workspace|tojson }}</script>
+{% endblock %}

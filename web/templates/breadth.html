@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% from "components/data_status.html" import status_line %}
+{% block title %}市场宽度 · CS2 Market Desk{% endblock %}
+{% block content %}
+
+{# —— 涨跌分布三段条（terminal.css 之外的模板级补充，仅本页生效） —— #}
+<style>
+  .dist-bar{display:flex;width:100%;height:34px;border-radius:var(--r);overflow:hidden;border:1px solid var(--border);font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;font-weight:600}
+  .dist-bar>div{display:flex;align-items:center;justify-content:center;min-width:0;overflow:hidden;white-space:nowrap;transition:width .4s ease}
+  .dist-up{background:var(--up);color:#fff}
+  .dist-flat{background:var(--surface-active);color:var(--text-2)}
+  .dist-down{background:var(--down);color:#fff}
+  .dist-missing{background:var(--border);color:var(--text-3)}
+  .count-pill{display:flex;flex-direction:column;gap:2px;padding:10px 14px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r);min-width:0}
+  .count-pill span{font-size:11px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .count-pill strong{font-family:var(--mono);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+  .count-pill.up strong{color:var(--up)}
+  .count-pill.down strong{color:var(--down)}
+  .item-cell{display:flex;align-items:center;gap:10px;min-width:0;color:var(--text)}
+  .item-cell strong{display:block;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600;color:var(--text)}
+  .item-thumb{flex:none;display:inline-grid;place-items:center;width:38px;height:28px;border-radius:var(--r-sm);background:var(--bg-raised);border:1px solid var(--border);overflow:hidden}
+  .item-thumb img{width:100%;height:100%;object-fit:contain}
+  .item-thumb svg{width:14px;height:14px;color:var(--text-3)}
+  .chip-num{display:inline-block;min-width:64px;text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;font-weight:600}
+  .chip-num.up{color:var(--up)}
+  .chip-num.down{color:var(--down)}
+</style>
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Research / Breadth</span>
+    <h1>市场宽度</h1>
+    <p class="sub">观察当前导购活跃样本的涨跌结构；样本不代表全市场全部饰品。</p>
+  </div>
+  <div class="flex"><a class="btn" href="/research/sections"><i data-lucide="layers-3" aria-hidden="true"></i>板块指数</a></div>
+</header>
+{{ status_line('行情站B 快照 / BUFF 7 日均价', rows[0].ts if rows else none, 'partial' if rows else 'collecting', '涨跌口径：现价相对 7 日均价，阈值 ±0.5%') }}
+
+<section class="panel" aria-label="样本涨跌分布">
+  <div class="panel-head">
+    <div class="panel-title"><h2>涨跌分布</h2><span class="sub">阈值 ±0.5% 计为中性</span></div>
+    <span class="sub num">样本 {{ counts.total }}</span>
+  </div>
+  <div class="grid" style="grid-template-columns:repeat(5,1fr);gap:8px">
+    <div class="count-pill"><span>样本数量</span><strong>{{ counts.total }}</strong></div>
+    <div class="count-pill up"><span>上涨</span><strong>{{ counts.up }}</strong></div>
+    <div class="count-pill"><span>中性（±0.5%）</span><strong>{{ counts.flat }}</strong></div>
+    <div class="count-pill down"><span>下跌</span><strong>{{ counts.down }}</strong></div>
+    <div class="count-pill"><span>缺少 7 日基准</span><strong style="color:var(--text-3)">{{ counts.missing }}</strong></div>
+  </div>
+  {% if counts.total %}
+  <div class="dist-bar" role="img" aria-label="上涨 {{ counts.up }} 件，中性 {{ counts.flat }} 件，下跌 {{ counts.down }} 件，缺少基准 {{ counts.missing }} 件">
+    <div class="dist-up" style="width:{{ (counts.up / counts.total * 100)|round(2, 'common') }}%">↑{{ counts.up }}</div>
+    <div class="dist-flat" style="width:{{ (counts.flat / counts.total * 100)|round(2, 'common') }}%">{{ counts.flat }}</div>
+    <div class="dist-down" style="width:{{ (counts.down / counts.total * 100)|round(2, 'common') }}%">↓{{ counts.down }}</div>
+    <div class="dist-missing" style="width:{{ (counts.missing / counts.total * 100)|round(2, 'common') }}%">{{ counts.missing }}</div>
+  </div>
+  <p class="sub mt-2">红=上涨 · 灰=中性 · 绿=下跌 · 深灰=缺少基准；宽度按样本占比。</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <div class="panel-title"><h2>样本明细</h2><span class="sub">按导购挂单排序</span></div>
+    <a class="btn sm" href="/research/rankings">打开排行榜<i data-lucide="arrow-right" aria-hidden="true"></i></a>
+  </div>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>饰品</th><th class="num">BUFF 价</th><th class="num">7 日均价</th><th class="num">偏离</th><th class="num">导购挂单</th><th>更新</th></tr></thead>
+      <tbody>
+        {% for row in rows %}{% set diff = row.diff.get('buff') %}
+        <tr>
+          <td><a class="item-cell" href="/market/items/{{ row.name|urlencode }}?from=/research/breadth">
+            <span class="item-thumb">{% if row.profile.get('image_url') %}<img src="/api/image?url={{ row.profile.get('image_url')|urlencode }}" alt="" loading="lazy">{% else %}<i data-lucide="package" aria-hidden="true"></i>{% endif %}</span>
+            <span><strong>{{ row.name }}</strong></span></a></td>
+          <td class="num">{{ "%.2f"|format(row.price.get('buff')) if row.price.get('buff') is not none else '未覆盖' }}</td>
+          <td class="num">{{ "%.2f"|format(row.avg7.get('buff')) if row.avg7.get('buff') is not none else '未覆盖' }}</td>
+          <td class="num"><span class="chip-num {{ 'up' if diff is not none and diff >= 0 else 'down' }}">{{ '%+.2f%%'|format(diff) if diff is not none else '无基准' }}</span></td>
+          <td class="num">{{ "{:,}".format(row.broker_sell|int) }}</td>
+          <td class="muted"><span class="reltime" data-ts="{{ row.ts }}">{{ row.ts[:16] }}</span></td>
+        </tr>
+        {% else %}<tr><td colspan="6" class="empty">暂无可用样本</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

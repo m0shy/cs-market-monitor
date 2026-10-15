@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}饰品异动 · CS2 Market Desk{% endblock %}
+{% block content %}
+
+<nav class="breadcrumb" aria-label="面包屑">
+  <a href="/monitor/radar">监控中心</a><span>/</span><span>饰品异动</span>
+</nav>
+
+<header class="page-head">
+  <div>
+    <div class="eyebrow">Monitor / Changes</div>
+    <h1>饰品异动</h1>
+    <p class="sub">价格、在售量和求购量变化的信号流，可直接回到对应饰品详情</p>
+  </div>
+  <div class="flex gap-2">
+    <span class="sub num" id="changes-refresh">{{ workspace.generated_at|tslabel }}</span>
+    <a class="btn" href="/monitor/radar">异动雷达</a>
+    <a class="btn primary" href="/research/rankings">机会榜单</a>
+  </div>
+</header>
+
+{% set ch_status = freshness_status(workspace.events[0].ts if workspace.events else none, 'partial' if workspace.events else 'collecting') %}
+<div class="flex-wrap" style="gap:8px;font-size:12px;color:var(--text-3);margin-bottom:12px">
+  <span class="tag info">行情站B 近期事件</span>
+  <span class="tag {{ 'down' if ch_status == 'ready' else ('warn' if ch_status in ('partial', 'stale', 'blocked', 'error') else 'flat') }}">{{ {'ready': '可用', 'partial': '部分覆盖', 'collecting': '采集中', 'stale': '数据过期', 'missing': '尚无数据', 'blocked': '来源受限', 'error': '读取失败'}.get(ch_status, ch_status) }}</span>
+  {% if workspace.events %}<span class="num">更新 {{ market_time_label(workspace.events[0].ts) }}（北京时间）</span>{% else %}<span>无更新时间</span>{% endif %}
+  <span>单次快照阈值事件，时间可能早于当前时钟</span>
+  <a href="/data/coverage">覆盖详情</a>
+</div>
+
+<section class="grid grid-4" style="margin-bottom:12px">
+  <article class="metric-card">
+    <span class="metric-label">当前信号 <span class="tag flat">近期快照</span></span>
+    <span class="metric-value" id="changes-total" style="font-size:30px">{{ workspace.summary.total }}</span>
+    <span class="metric-sub">筛选结果</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">导购平台 <span class="tag flat">优先</span></span>
+    <span class="metric-value" id="changes-focus" style="font-size:30px">{{ workspace.summary.focus }}</span>
+    <span class="metric-sub">悠悠 / C5 / Steam / Halo</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">价格变化 <span class="tag warn">阈值 ≥ 3%</span></span>
+    <span class="metric-value" id="changes-price" style="font-size:30px">{{ workspace.summary.price }}</span>
+    <span class="metric-sub">最新与上一快照比较</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">挂单变化 <span class="tag warn">阈值 ≥ 40%</span></span>
+    <span class="metric-value" id="changes-listing" style="font-size:30px">{{ workspace.summary.listing }}</span>
+    <span class="metric-sub">在售量 / 求购量</span>
+  </article>
+</section>
+
+<section class="panel">
+  <form class="flex-wrap" method="get" action="/monitor/events" style="gap:8px;margin-bottom:12px">
+    <span class="input-shell"><input type="search" name="q" value="{{ workspace.query }}" placeholder="搜索饰品，例如 AK-47 | Redline" autocomplete="off"></span>
+    <select name="platform" aria-label="平台">
+      <option value="">全部平台</option>
+      {% for key, label in [('youpin', '悠悠'), ('c5', 'C5'), ('steam', 'Steam'), ('haloskins', 'Halo'), ('buff', 'BUFF')] %}
+      <option value="{{ key }}" {{ 'selected' if workspace.platform == key else '' }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select name="metric" aria-label="指标">
+      <option value="">全部指标</option>
+      <option value="sell_price" {{ 'selected' if workspace.metric == 'sell_price' else '' }}>在售价</option>
+      <option value="sell_num" {{ 'selected' if workspace.metric == 'sell_num' else '' }}>在售量</option>
+      <option value="buy_price" {{ 'selected' if workspace.metric == 'buy_price' else '' }}>求购价</option>
+      <option value="buy_num" {{ 'selected' if workspace.metric == 'buy_num' else '' }}>求购量</option>
+    </select>
+    <button class="btn primary" type="submit">应用筛选</button>
+    <a class="btn ghost" href="/monitor/events">重置</a>
+  </form>
+
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>时间</th><th>饰品</th><th>指标</th><th class="num">旧 → 新</th><th class="num">变化</th><th>平台</th></tr></thead>
+      <tbody id="changes-body">
+        {% for e in workspace.events %}
+        {% set role = platform_role(e.platform) %}
+        <tr>
+          <td class="muted"><span class="reltime" data-ts="{{ e.ts }}">{{ e.ts[:16] }}</span></td>
+          <td>
+            <a class="flex gap-2" href="/market/items/{{ e.name|urlencode }}?from={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else ''))|urlencode }}">
+              {% if e.profile.get('image_url') %}<img src="/api/image?url={{ e.profile.get('image_url')|urlencode }}" alt="" loading="lazy" style="width:32px;height:24px;object-fit:contain;flex:none">{% endif %}
+              <span><strong>{{ e.name }}</strong><br><span class="sub">{{ e.profile.get('rarity') or 'CS2 饰品' }}</span></span>
+            </a>
+          </td>
+          <td><span class="tag flat">{{ {'sell_price': '在售价', 'sell_num': '在售量', 'buy_price': '求购价', 'buy_num': '求购量'}.get(e.metric, e.metric) }}</span></td>
+          <td class="num">
+            <span class="muted">{{ '¥%.2f'|format(e.old) if e.metric in ['sell_price', 'buy_price'] else '{:,}'.format(e.old|round|int) }}</span>
+            <span class="{{ 'up' if e.ratio >= 0 else 'down' }}" style="font-weight:700">→</span>
+            <span style="font-weight:600">{{ '¥%.2f'|format(e.new) if e.metric in ['sell_price', 'buy_price'] else '{:,}'.format(e.new|round|int) }}</span>
+          </td>
+          <td class="num"><a class="num {{ 'up' if e.ratio >= 0 else 'down' }}" href="/monitor/events/{{ e.key }}?from={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else ''))|urlencode }}" title="查看触发证据">{{ "%+.1f%%"|format(e.ratio) }}</a></td>
+          <td><span class="chip" {% if role[1] == 'focus' %}style="border-color:var(--accent-border);color:var(--accent)"{% endif %}>{{ e.platform }} · {{ role[0] }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="empty">当前筛选范围没有异动信号</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<script id="changes-data" type="application/json">{{ workspace|tojson }}</script>
+{% endblock %}

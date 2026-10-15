@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}品类走势 · CS2 Market Desk{% endblock %}
+{% block content %}
+
+{# —— 品类走势终端组件（terminal.css 之外的模板级补充，仅本页生效） —— #}
+<style>
+  .v3-seg{display:inline-flex;gap:2px;padding:2px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r-sm)}
+  .v3-seg button{padding:4px 10px;border-radius:4px;font-size:12px;color:var(--text-3)}
+  .v3-seg button:hover{color:var(--text)}
+  .v3-seg button.active{background:var(--accent);color:#fff;font-weight:600}
+  .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+  .trend-summary-card{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px 14px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r);text-align:left;transition:all var(--t-fast)}
+  .trend-summary-card:hover{border-color:var(--accent-border);background:var(--surface-hi)}
+  .trend-summary-card.active{border-color:var(--accent);background:var(--accent-soft)}
+  .trend-summary-card span{font-size:12px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .trend-summary-card strong{font-family:var(--mono);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text);line-height:1.1}
+  .trend-summary-card small{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:11px;color:var(--text-3)}
+  .trend-summary-card small.up{color:var(--up)}
+  .trend-summary-card small.down{color:var(--down)}
+  .trend-tabs{display:inline-flex;gap:2px;padding:3px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r);overflow-x:auto;max-width:100%;scrollbar-width:none}
+  .trend-tabs::-webkit-scrollbar{display:none}
+  .trend-tabs button{padding:5px 12px;border-radius:var(--r-sm);font-size:12px;color:var(--text-2);white-space:nowrap}
+  .trend-tabs button:hover{color:var(--text);background:var(--surface-hi)}
+  .trend-tabs button.active{color:#fff;background:var(--accent-soft);font-weight:600}
+  .trend-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:10px}
+  .inline-select{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-3)}
+  .item-cell{display:flex;align-items:center;gap:10px;min-width:0;color:var(--text)}
+  .item-cell strong{display:block;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600;color:var(--text)}
+  .item-cell small{display:block;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-3);font-size:11px}
+  .item-thumb{flex:none;display:inline-grid;place-items:center;width:46px;height:34px;border-radius:var(--r-sm);background:var(--bg-raised);border:1px solid var(--border);overflow:hidden}
+  .item-thumb img{width:100%;height:100%;object-fit:contain}
+  .item-thumb svg{width:16px;height:16px;color:var(--text-3)}
+  .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;white-space:nowrap}
+  .badge-secondary{color:var(--accent);background:var(--accent-soft)}
+  .chip-num{display:inline-block;min-width:64px;text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;font-weight:600}
+  .chip-num.up{color:var(--up)}
+  .chip-num.down{color:var(--down)}
+  .icon-btn{display:inline-grid;place-items:center;width:26px;height:26px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text-2)}
+  .icon-btn:hover{color:var(--text);border-color:var(--border-hi);background:var(--surface-hi)}
+  .icon-btn svg{width:13px;height:13px}
+  .refresh-hint{font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums}
+  .trend-calendar-wrap{overflow-x:auto}
+  .trend-cal-header,.trend-cal-row{display:grid;grid-template-columns:180px repeat(7,minmax(58px,1fr));gap:3px;min-width:560px}
+  .trend-cal-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--text-2);padding:6px 4px}
+  .trend-cal-col{text-align:center;font-size:10px;color:var(--text-3);padding:4px 0}
+  .trend-cal-date{font-family:var(--mono);color:var(--text-2)}
+  .trend-cal-cell{position:relative;display:grid;place-items:center;height:44px;border-radius:var(--r-sm);font-family:var(--mono);font-size:11px;color:#fff;cursor:default}
+  .trend-cal-cell.nodata{background:var(--surface-active)!important;color:var(--text-3)}
+  .reading-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:700px){.reading-grid{grid-template-columns:1fr}}
+  .reading-grid>div{display:flex;flex-direction:column;gap:4px}
+  .reading-grid b{font-size:13px;color:var(--text)}
+  .reading-grid span{font-size:12px;color:var(--text-3)}
+</style>
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Category trend</span>
+    <h1>动态监控饰品品类走势</h1>
+    <p class="sub">按品类、平台和相对 7 日均价的偏离观察市场动量，点击饰品可进入完整行情工作台。</p>
+  </div>
+  <div class="flex">
+    <span class="chip">行情站B SNAPSHOT</span>
+    <a class="btn primary" href="/research/index"><i data-lucide="chart-candlestick" aria-hidden="true"></i>打开指数工作台</a>
+  </div>
+</header>
+
+<section class="panel">
+  <div class="panel-head">
+    <div class="panel-title">
+      <div><h2>大盘指数走势</h2><span class="sub" id="trend-chart-sub">行情站B 公开 K 线（与品类口径独立）</span></div>
+    </div>
+    <div class="v3-seg" id="trend-period" role="tablist" aria-label="走势周期">
+      <button data-period="1day">日K</button>
+      <button class="active" data-period="7day">周K</button>
+      <button data-period="15day">15日</button>
+      <button data-period="30day">月K</button>
+    </div>
+  </div>
+  <div id="trend-index-chart" style="width:100%;height:420px" role="img" aria-label="大盘指数走势图"></div>
+</section>
+
+<section class="summary-grid" aria-label="品类摘要">
+  <button type="button" class="trend-summary-card all {{ 'active' if trend.category == 'all' else '' }}" data-trend-category="all" aria-pressed="{{ 'true' if trend.category == 'all' else 'false' }}">
+    <span class="trend-summary-name">全部品类</span>
+    <strong>{{ trend.total_count|default(trend.rows|length) }}</strong>
+    <small>当前可比较标的</small>
+  </button>
+  {% for category in trend.categories %}
+  <button type="button" class="trend-summary-card {{ 'active' if trend.category == category.key else '' }}" data-trend-category="{{ category.key }}" aria-pressed="{{ 'true' if trend.category == category.key else 'false' }}">
+    <span class="trend-summary-name">{{ category.label }}</span>
+    <strong>{{ category.count }}</strong>
+    <small class="{{ 'up' if (category.change or 0) >= 0 else 'down' }}">
+      {{ "%+.2f%%"|format(category.change) if category.change is not none else '暂无变化' }}
+    </small>
+  </button>
+  {% endfor %}
+</section>
+
+<section class="panel mt-3" id="trend-board">
+  <div class="panel-head">
+    <div class="panel-title">
+      <div><h2>品类行情列表</h2><span class="sub" id="trend-result-note">按当前筛选实时排序</span></div>
+    </div>
+    <span class="refresh-hint" id="trend-refresh">本地快照</span>
+  </div>
+
+  <div class="trend-toolbar">
+    <div class="trend-tabs" role="tablist" aria-label="品类筛选">
+      <button id="trend-tab-all" class="{{ 'active' if trend.category == 'all' else '' }}" data-trend-category="all" role="tab" aria-selected="{{ 'true' if trend.category == 'all' else 'false' }}" aria-controls="trend-body">全部</button>
+      {% for category in trend.categories %}
+      <button id="trend-tab-{{ category.key }}" class="{{ 'active' if trend.category == category.key else '' }}" data-trend-category="{{ category.key }}" role="tab" aria-selected="{{ 'true' if trend.category == category.key else 'false' }}" aria-controls="trend-body">{{ category.label }}</button>
+      {% endfor %}
+    </div>
+    <div class="flex">
+      <div class="v3-seg" role="tablist" aria-label="平台切换" data-trend-platform>
+      {% for key, label in [('buff', 'BUFF'), ('youpin', 'UU'), ('c5', 'C5'), ('steam', 'Steam'), ('haloskins', 'Halo')] %}
+        <button id="trend-platform-{{ key }}" class="{{ 'active' if trend.platform == key else '' }}" data-platform="{{ key }}" role="tab" aria-selected="{{ 'true' if trend.platform == key else 'false' }}" aria-controls="trend-body">{{ label }}</button>
+        {% endfor %}
+      </div>
+      <label class="inline-select">
+        <span>排序</span>
+        <select id="trend-sort">
+          <option value="default" {{ 'selected' if trend_sort == 'default' else '' }}>综合</option>
+          <option value="change" {{ 'selected' if trend_sort == 'change' else '' }}>偏离幅度</option>
+          <option value="price" {{ 'selected' if trend_sort == 'price' else '' }}>当前价格</option>
+          <option value="supply" {{ 'selected' if trend_sort == 'supply' else '' }}>导购挂单</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>饰品</th>
+          <th>品类</th>
+          <th class="num">当前价格</th>
+          <th class="num">7 日均价</th>
+          <th class="num">偏离</th>
+          <th class="num">导购挂单</th>
+          <th>更新时间</th>
+          <th aria-label="操作"></th>
+        </tr>
+      </thead>
+      <tbody id="trend-body">
+        {% for r in trend.rows %}
+        <tr>
+          <td class="num muted">{{ loop.index }}</td>
+          <td>
+            <a class="item-cell" href="/market/items/{{ r.name|urlencode }}?from=/research/trends">
+              <span class="item-thumb">
+                {% if r.profile.get('image_url') %}<img src="/api/image?url={{ r.profile.get('image_url')|urlencode }}" alt="" loading="lazy">{% else %}<i data-lucide="package" aria-hidden="true"></i>{% endif %}
+              </span>
+              <span><strong>{{ r.name }}</strong><small>{{ r.profile.get('rarity') or 'CS2 饰品' }}</small></span>
+            </a>
+          </td>
+          <td><span class="badge badge-secondary">{{ r.category_label }}</span></td>
+          <td class="num" style="font-weight:600">{{ "%.2f"|format(r.selected_price) if r.selected_price is not none else '-' }}</td>
+          <td class="num">{{ "%.2f"|format(r.selected_average) if r.selected_average is not none else '-' }}</td>
+          <td class="num"><span class="chip-num {{ 'up' if (r.trend_rate or 0) >= 0 else 'down' }}">{{ "%+.2f%%"|format(r.trend_rate) if r.trend_rate is not none else '-' }}</span></td>
+          <td class="num">{{ "{:,}".format(r.broker_sell|int) if r.broker_sell is not none else '-' }}</td>
+          <td class="muted"><span class="reltime" data-ts="{{ r.ts }}">{{ r.ts[:16] if r.ts else '-' }}</span></td>
+          <td><a class="icon-btn" href="/market/items/{{ r.name|urlencode }}?from=/research/trends" aria-label="查看 {{ r.name }}" title="查看详情"><i data-lucide="chevron-right" aria-hidden="true"></i></a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="empty">当前筛选暂无可用行情</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel" id="trend-calendar-panel" style="display:none;">
+  <div class="panel-head">
+    <div class="panel-title">
+      <div><h2>Weekly Price Calendar</h2><span class="sub">Daily sell-price heatmap (last 7 days)</span></div>
+    </div>
+  </div>
+  <div class="trend-calendar-wrap" id="trend-calendar-wrap">
+    <div class="muted">Loading calendar data...</div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <div class="panel-title">
+      <div><h2>数据口径</h2><span class="sub">用于快速筛选，不替代单饰品历史序列</span></div>
+    </div>
+  </div>
+  <div class="reading-grid">
+    <div><b>偏离</b><span>当前平台卖价相对同平台 7 日均价的变化比例。</span></div>
+    <div><b>导购挂单</b><span>UU、C5、Steam 与 Halo 的在售量合计。</span></div>
+    <div><b>深入查看</b><span>进入详情页后可切换总览与平台图表，并使用指标和画图工具。</span></div>
+  </div>
+</section>
+
+<script id="trend-data" type="application/json">{{ trend|tojson }}</script>
+{% endblock %}

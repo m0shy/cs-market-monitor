@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% from "components/data_status.html" import status_line %}
+{% block title %}跨平台比较 · CS2 Market Desk{% endblock %}
+{% block content %}
+
+{# —— 跨平台比价终端组件（terminal.css 之外的模板级补充，仅本页生效） —— #}
+<style>
+  .filter-form{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+  .filter-form label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text-3)}
+  .filter-form .input-shell{width:190px}
+  .filter-form .actions{display:flex;gap:6px;margin-left:auto}
+  .item-cell{display:flex;align-items:center;gap:10px;min-width:0;color:var(--text)}
+  .item-cell strong{display:block;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600;color:var(--text)}
+  .item-cell small{display:block;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-3);font-size:11px}
+  .item-thumb{flex:none;display:inline-grid;place-items:center;width:38px;height:28px;border-radius:var(--r-sm);background:var(--bg-raised);border:1px solid var(--border);overflow:hidden}
+  .item-thumb img{width:100%;height:100%;object-fit:contain}
+  .item-thumb svg{width:14px;height:14px;color:var(--text-3)}
+  .plat-low{color:var(--down);font-weight:700}
+  .low-tag{display:inline-block;margin-left:4px;padding:0 5px;border-radius:3px;background:var(--down-soft);color:var(--down);font-size:10px;font-style:normal;font-weight:600;line-height:16px;vertical-align:1px}
+  .plat-high{color:var(--up)}
+  .plat-mute{color:var(--text-3)}
+</style>
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Market / Quotes</span>
+    <h1>跨平台比较</h1>
+    <p class="sub">筛选导购活跃样本的公开平台卖价。快照时间可能不同，价差尚未扣除手续费、汇率和交割成本。</p>
+  </div>
+  <div class="flex"><a class="btn" href="/market/items"><i data-lucide="scan-search" aria-hidden="true"></i>饰品目录</a></div>
+</header>
+{{ status_line('行情站B 平台快照', rows[0].ts if rows else none, 'partial' if available_count else 'collecting', '导购活跃样本；同一记录至少覆盖两个平台，报价时间可能不同') }}
+
+<section class="panel" aria-label="报价筛选">
+  <form class="filter-form" method="get" action="/market/compare">
+    <label><span>饰品名称</span>
+      <span class="input-shell"><i data-lucide="search" aria-hidden="true"></i>
+      <input type="search" name="q" value="{{ query }}" placeholder="例如 AK-47" autocomplete="off"></span></label>
+    <label><span>覆盖平台</span><select name="platform">
+      <option value="">全部平台</option>
+      {% for key in ['buff', 'youpin', 'c5', 'steam', 'haloskins', 'skinport', 'waxpeer', 'dmarket'] %}
+      <option value="{{ key }}" {{ 'selected' if platform == key else '' }}>{{ key|upper }}</option>
+      {% endfor %}
+    </select></label>
+    <label><span>价格地板</span><select name="min_price">
+      {% for floor in (0, 0.5, 1, 5, 10, 50) %}
+      <option value="{{ floor }}" {{ 'selected' if min_price == floor else '' }}>{{ '不过滤' if floor == 0 else '¥' ~ floor ~ ' 以上' }}</option>
+      {% endfor %}
+    </select></label>
+    <label><span>最小报价差异</span><select name="min_spread">
+      {% for threshold in [0, 5, 10, 20] %}
+      <option value="{{ threshold }}" {{ 'selected' if min_spread == threshold else '' }}>{{ threshold }}% 以上</option>
+      {% endfor %}
+    </select></label>
+    <div class="actions">
+      <button class="btn primary" type="submit">应用筛选</button>
+      <a class="btn ghost" href="/market/compare">重置</a>
+    </div>
+  </form>
+</section>
+
+<section class="panel" aria-labelledby="compare-title">
+  <div class="panel-head">
+    <div class="panel-title"><h2 id="compare-title">报价差异</h2><span class="sub">筛选结果 {{ rows|length }} 件 / 样本 {{ available_count }} 件</span></div>
+    <a class="btn sm" href="/assets/arbitrage">查看手续费假设<i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
+  </div>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>饰品</th>
+          {% for key in ['buff', 'youpin', 'c5', 'steam', 'haloskins', 'skinport', 'waxpeer', 'dmarket'] %}
+          <th class="num">{{ key|upper }}</th>
+          {% endfor %}
+          <th class="num">绝对价差</th><th class="num">未扣费价差</th><th class="num">来源数</th><th>更新</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td><a class="item-cell" href="/market/items/{{ row.name|urlencode }}?from={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else ''))|urlencode }}">
+            <span class="item-thumb">{% if row.profile.get('image_url') %}<img src="/api/image?url={{ row.profile.get('image_url')|urlencode }}" alt="" loading="lazy">{% else %}<i data-lucide="package" aria-hidden="true"></i>{% endif %}</span>
+            <span><strong>{{ row.name }}</strong><small>{{ row.profile.get('rarity') or 'CS2 饰品' }}</small></span></a></td>
+          {% for key in ['buff', 'youpin', 'c5', 'steam', 'haloskins', 'skinport', 'waxpeer', 'dmarket'] %}
+          <td class="num{% if row.lowest[0] == key %} plat-low{% elif row.highest[0] == key %} plat-high{% elif not row.price.get(key) %} plat-mute{% endif %}">
+            {%- if row.price.get(key) %}{{ "%.2f"|format(row.price.get(key)) }}{% if row.lowest[0] == key %}<em class="low-tag">低</em>{% endif %}{% else %}-{% endif -%}
+          </td>
+          {% endfor %}
+          <td class="num">¥{{ "%.2f"|format(row.difference) }}</td>
+          <td class="num" style="font-weight:600">{{ "%+.2f%%"|format(row.spread) }}</td>
+          <td class="num">{{ row.source_count }}</td>
+          <td class="muted"><span class="reltime" data-ts="{{ row.ts }}">{{ row.ts[:16] }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="13" class="empty">
+          <div class="empty-state"><i data-lucide="search-x" aria-hidden="true"></i><strong>当前条件没有可比较报价</strong><span><a href="/market/compare">重置筛选</a>或<a href="/data/coverage">查看覆盖情况</a></span></div>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="sub mt-3">绿色“低”= 当前样本最低卖价平台；红色=最高价平台。BUFF / UU / C5 / Steam / Halo / Skinport / Waxpeer / DMarket 列为各自最新卖价快照，缺失记“-”。</p>
+</section>
+{% endblock %}

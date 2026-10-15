@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}市场总览 · CS2 Market Desk{% endblock %}
+{% block content %}
+<style>
+.seg{display:inline-flex;background:var(--bg-raised);border:1px solid var(--border-hi);border-radius:var(--r-sm);padding:2px;gap:2px}
+.seg button{padding:4px 12px;border-radius:4px;font-size:12px;color:var(--text-2)}
+.seg button.active{background:var(--accent-soft);color:var(--accent)}
+.rank-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;background:var(--surface-active);color:var(--text-2)}
+.rank-badge.r1{background:rgba(255,215,0,.16);color:#ffd700}
+.rank-badge.r2{background:rgba(192,192,192,.16);color:#c0c0c0}
+.rank-badge.r3{background:rgba(205,127,50,.18);color:#cd7f32}
+.item-cell{display:flex;align-items:center;gap:10px;color:var(--text);min-width:0}
+.item-cell:hover{color:var(--text)}
+.item-cell strong{display:block;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-cell small{display:block;font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.item-thumb{flex:none;width:38px;height:29px;border-radius:4px;background:var(--surface-active);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.item-thumb img{width:100%;height:100%;object-fit:contain}
+.pill{font-family:var(--mono);font-size:13px;font-weight:600;padding:1px 6px;border-radius:4px}
+.stat-diff.up .pill{background:var(--up-soft)}
+.stat-diff.down .pill{background:var(--down-soft)}
+.dist-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--surface-active);margin:8px 0}
+.dist-bar i{display:block;height:100%}
+.dist-bar i.up{background:var(--up)}
+.dist-bar i.down{background:var(--down)}
+.dist-bar i.flat{background:var(--flat)}
+.dist-legend{display:flex;justify-content:space-between;font-size:12px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.dist-legend b{color:var(--text);font-family:var(--mono)}
+.ticker{display:flex;align-items:center;gap:10px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r);padding:0 12px;height:36px;margin-bottom:var(--sp-3);overflow:hidden}
+.ticker-track{display:flex;gap:32px;white-space:nowrap;font-size:12px;color:var(--text-2);font-variant-numeric:tabular-nums}
+.pulse{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--up);margin-right:6px;animation:dotPulse 1.2s infinite}
+.skeleton{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--surface-active),var(--surface-hi),var(--surface-active));background-size:200% 100%;animation:sk 1.2s infinite linear}
+@keyframes sk{from{background-position:200% 0}to{background-position:-200% 0}}
+.home-main{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:var(--sp-3)}
+@media(max-width:1100px){.home-main{grid-template-columns:1fr}}
+.stat-spark{height:34px;margin-top:6px}
+</style>
+
+<div class="ticker" id="ticker">
+  <span class="sub"><span class="pulse"></span>近期热度</span>
+  <div class="ticker-track" id="ticker-track"></div>
+</div>
+
+<section class="grid grid-4" aria-label="市场摘要">
+  <article class="metric-card">
+    <div class="flex-between"><span class="metric-label">行情站B 饰品指数</span><span class="tag info">行情站B</span></div>
+    <div class="metric-value" id="m-index">{{ "%.2f"|format(snap.get('broadMarketIndex')) if snap.get('broadMarketIndex') is not none else '未覆盖' }}</div>
+    <span class="stat-diff {{ 'up' if (snap.get('diffYesterdayRatio') or 0) >= 0 else 'down' }}" id="m-index-diff">
+      <span class="pill">{{ "%+.2f%%"|format(snap.get('diffYesterdayRatio')) if snap.get('diffYesterdayRatio') is not none else '—' }}</span>
+      <span id="m-index-abs">{{ "%+.2f"|format(snap.get('diffYesterday')) if snap.get('diffYesterday') is not none else '—' }}</span>
+    </span>
+    <div class="metric-sub">持有人 <b id="m-holders">{{ snap.get('holdersNum')|metric }}</b> · 存世量 <b id="m-survive">{{ snap.get('surviveNum')|metric }}</b> · 连续 <b id="m-risefall">{{ snap.get('riseFallDays')|metric }}</b> 天</div>
+    <div class="stat-spark" id="index-spark"><div class="skeleton"></div></div>
+  </article>
+
+  <article class="metric-card">
+    <div class="flex-between"><span class="metric-label">今日成交</span><span class="tag flat">快照</span></div>
+    <div class="metric-value" id="m-trade">{{ snap.get('todayStatistics.tradeNum')|metric }}</div>
+    <div class="metric-sub">成交额 <b id="m-trade-turnover">{{ snap.get('todayStatistics.turnover')|metric(2) }}</b></div>
+    <div class="metric-sub">新增饰品 <b id="m-trade-add">{{ snap.get('todayStatistics.addNum')|metric }}</b> · 估值 <b id="m-trade-valuation">{{ snap.get('todayStatistics.addValuation')|metric(2) }}</b></div>
+  </article>
+
+  <article class="metric-card">
+    <div class="flex-between"><span class="metric-label">昨日成交</span><span class="tag flat">对照</span></div>
+    <div class="metric-value" id="m-yday">{{ snap.get('yesterdayStatistics.tradeNum')|metric }}</div>
+    <div class="metric-sub">成交额 <b id="m-yday-turnover">{{ snap.get('yesterdayStatistics.turnover')|metric(2) }}</b></div>
+    <div class="metric-sub">新增饰品 <b id="m-yday-add">{{ snap.get('yesterdayStatistics.addNum')|metric }}</b> · 估值 <b id="m-yday-valuation">{{ snap.get('yesterdayStatistics.addValuation')|metric(2) }}</b></div>
+  </article>
+
+  <article class="metric-card">
+    <div class="flex-between"><span class="metric-label">盘面宽度</span><span class="tag flat">±0.5%</span></div>
+    <div class="metric-value" style="font-size:22px" id="breadth-ratio">-</div>
+    <div class="dist-bar" id="breadth-bar"></div>
+    <div class="dist-legend"><span>↑ <b id="b-up">-</b></span><span>平 <b id="b-flat">-</b></span><span>↓ <b id="b-down">-</b></span></div>
+  </article>
+</section>
+
+<div class="home-main">
+  <div>
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><h2>大盘走势</h2><span class="sub">站点周 K 与公开日 K</span></div>
+        <div class="flex">
+          <div class="seg" id="home-period" role="tablist" aria-label="大盘周期">
+            <button class="active" data-home-period="1day" role="tab" aria-selected="true">全部公开 K 线</button>
+            <button data-home-period="7day" role="tab" aria-selected="false">周 K 观测</button>
+          </div>
+          <a class="btn sm" href="/research/index">指数详情</a>
+        </div>
+      </div>
+      <div class="chart-box" id="home-chart-box" style="min-height:380px">
+        <div id="market-kline-chart" role="img" aria-label="大盘价格 K 线图"></div>
+        <div class="chart-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-3);font-size:13px">大盘行情加载中…</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><h2>指数分时</h2><span class="sub">最近 48 小时采集点</span></div>
+      </div>
+      <div class="chart-box" style="min-height:220px">
+        <div id="index-line-chart" role="img" aria-label="饰品指数分时走势"></div>
+      </div>
+      <p class="sub" id="index-line-freshness" aria-live="polite">正在核对小时指数的采集时间…</p>
+    </section>
+  </div>
+
+  <aside>
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><h2>今日涨幅榜</h2><span class="sub">BUFF 口径</span></div>
+        <a class="btn ghost sm" href="/research/rankings">全部</a>
+      </div>
+      <table class="data-table">
+        <tbody>
+          {% for r in gain %}
+          {% set d = r.diff.get('buff') %}
+          <tr>
+            <td><span class="rank-badge {{ 'r1' if loop.index == 1 else ('r2' if loop.index == 2 else ('r3' if loop.index == 3 else '')) }}">{{ loop.index }}</span></td>
+            <td>
+              <a class="item-cell" href="/market/items/{{ r.name|urlencode }}?from=/">
+                <span class="item-thumb">{% if r.profile.get('image_url') %}<img src="/api/image?url={{ r.profile.get('image_url')|urlencode }}" alt="" loading="lazy">{% endif %}</span>
+                <span><strong>{{ r.name }}</strong><small>¥{{ "%.2f"|format(r.price.get('buff')) if r.price.get('buff') else '-' }}</small></span>
+              </a>
+            </td>
+            <td class="num up">{{ "%+.2f%%"|format(d) if d is not none else '-' }}</td>
+          </tr>
+          {% else %}
+          <tr><td class="empty" colspan="3">暂无涨幅数据</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><h2>今日跌幅榜</h2><span class="sub">BUFF 口径</span></div>
+        <a class="btn ghost sm" href="/research/rankings">全部</a>
+      </div>
+      <table class="data-table">
+        <tbody>
+          {% for r in loss %}
+          {% set d = r.diff.get('buff') %}
+          <tr>
+            <td><span class="rank-badge {{ 'r1' if loop.index == 1 else ('r2' if loop.index == 2 else ('r3' if loop.index == 3 else '')) }}">{{ loop.index }}</span></td>
+            <td>
+              <a class="item-cell" href="/market/items/{{ r.name|urlencode }}?from=/">
+                <span class="item-thumb">{% if r.profile.get('image_url') %}<img src="/api/image?url={{ r.profile.get('image_url')|urlencode }}" alt="" loading="lazy">{% endif %}</span>
+                <span><strong>{{ r.name }}</strong><small>¥{{ "%.2f"|format(r.price.get('buff')) if r.price.get('buff') else '-' }}</small></span>
+              </a>
+            </td>
+            <td class="num down">{{ "%+.2f%%"|format(d) if d is not none else '-' }}</td>
+          </tr>
+          {% else %}
+          <tr><td class="empty" colspan="3">暂无跌幅数据</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><h2>近期异动</h2><span class="sub">最新触发信号</span></div>
+        <a class="btn ghost sm" href="/monitor/radar">雷达</a>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>饰品</th><th>平台</th><th class="num">变化</th></tr></thead>
+        <tbody id="tracker-mini-body"><tr><td colspan="3" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </section>
+  </aside>
+</div>
+
+<section class="panel">
+  <div class="panel-head">
+    <div class="panel-title"><h2>跨平台报价雷达</h2><span class="sub">UU / C5 / Steam / Halo / BUFF 与 7 日均价</span></div>
+    <div class="flex"><span class="sub" id="hot-refresh"></span><a class="btn sm" href="/market/compare">跨平台比较</a></div>
+  </div>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th><th>饰品</th><th class="num">导购挂单</th>
+          <th class="num">UU</th><th class="num">C5</th><th class="num">Steam</th><th class="num">Halo</th>
+          <th class="num">BUFF</th><th class="num">7 日均价</th><th class="num">偏离</th><th>更新</th>
+        </tr>
+      </thead>
+      <tbody id="hot-body">
+        {% for r in hot %}
+        {% set d = r.diff.get('buff') %}
+        <tr>
+          <td><span class="rank-badge {{ 'r1' if loop.index == 1 else ('r2' if loop.index == 2 else ('r3' if loop.index == 3 else '')) }}">{{ loop.index }}</span></td>
+          <td>
+            <a class="item-cell" href="/market/items/{{ r.name|urlencode }}?from=/">
+              <span class="item-thumb">{% if r.profile.get('image_url') %}<img src="/api/image?url={{ r.profile.get('image_url')|urlencode }}" alt="" loading="lazy">{% endif %}</span>
+              <span><strong>{{ r.name }}</strong><small>{{ r.profile.get('rarity') or 'CS2 饰品' }}</small></span>
+            </a>
+          </td>
+          <td class="num">{{ "{:,}".format(r.broker_sell|int) }}</td>
+          <td class="num">{{ "%.2f"|format(r.price.get('youpin')) if r.price.get('youpin') else '-' }}</td>
+          <td class="num">{{ "%.2f"|format(r.price.get('c5')) if r.price.get('c5') else '-' }}</td>
+          <td class="num">{{ "%.2f"|format(r.price.get('steam')) if r.price.get('steam') else '-' }}</td>
+          <td class="num">{{ "%.2f"|format(r.price.get('haloskins')) if r.price.get('haloskins') else '-' }}</td>
+          <td class="num">{{ "%.2f"|format(r.price.get('buff')) if r.price.get('buff') else '-' }}</td>
+          <td class="num">{{ "%.2f"|format(r.avg7.get('buff')) if r.avg7.get('buff') else '-' }}</td>
+          <td class="num {{ 'up' if (d or 0) >= 0 else 'down' }}">{{ "%+.2f%%"|format(d) if d is not none else '-' }}</td>
+          <td class="muted"><span class="reltime" data-ts="{{ r.ts }}">{{ r.ts[:16] }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="11" class="empty">暂无热度数据</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

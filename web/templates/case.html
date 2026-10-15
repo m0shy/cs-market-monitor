@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}供给观察 · CS2 Market Desk{% endblock %}
+{% block content %}
+{% set total_value = namespace(v=0) %}
+{% for c in cases %}{% set total_value.v = total_value.v + (c.value or 0) %}{% endfor %}
+{% set max_value = cases[0].value if cases else 0 %}
+
+<header class="page-head">
+  <div>
+    <div class="eyebrow">Supply / Monitor</div>
+    <h1>供给与开箱观察</h1>
+    <p class="sub">通过容器快照与箱子价格观察市场供给侧变化</p>
+  </div>
+  <div class="flex gap-2">
+    <span class="chip">行情站A</span>
+    <a class="btn" href="/research/index">市场指数</a>
+  </div>
+</header>
+
+<section class="grid grid-3" style="margin-bottom:12px">
+  <article class="metric-card">
+    <span class="metric-label">容器记录 <span class="tag info">快照</span></span>
+    <span class="metric-value" style="font-size:30px">{{ "{:,}".format(container|int) }}</span>
+    <span class="metric-sub">条 · 已采集容器内饰品记录</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">最高箱价 <span class="tag warn">当前</span></span>
+    <span class="metric-value" style="font-size:30px">{{ "%.2f"|format(max_value) }}</span>
+    <span class="metric-sub">元 · {{ cases[0].name if cases else '—' }}</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">平均箱价 <span class="tag flat">样本</span></span>
+    <span class="metric-value" style="font-size:30px">{{ "%.2f"|format(total_value.v / cases|length) if cases else '—' }}</span>
+    <span class="metric-sub">元 · 共 {{ cases|length }} 个箱子</span>
+  </article>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <div class="panel-title">
+      <h2>箱子价格快照</h2>
+      <span class="sub">按最新价值排序 · 横条为相对最高价</span>
+    </div>
+  </div>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th>#</th><th>箱子</th><th class="num">价值</th><th style="width:34%">相对最高价</th><th>更新时间</th></tr></thead>
+      <tbody>
+        {% for c in cases %}
+        {% set pct = (c.value / max_value * 100)|round|int if max_value else 0 %}
+        <tr>
+          <td>{% if loop.index == 1 %}<span class="num" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border-radius:5px;font-size:12px;font-weight:700;background:#ffd700;color:#1a1206">1</span>
+            {% elif loop.index == 2 %}<span class="num" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border-radius:5px;font-size:12px;font-weight:700;background:#c0c0c0;color:#10141c">2</span>
+            {% elif loop.index == 3 %}<span class="num" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border-radius:5px;font-size:12px;font-weight:700;background:#cd7f32;color:#fff">3</span>
+            {% else %}<span class="num" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border-radius:5px;font-size:12px;font-weight:600;background:var(--surface-hi);border:1px solid var(--border-hi);color:var(--text-2)">{{ loop.index }}</span>{% endif %}</td>
+          <td><span class="flex gap-2"><span style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;background:var(--bg-raised);border:1px solid var(--border);border-radius:5px;font-size:11px;color:var(--text-2)">📦</span><strong>{{ c.name }}</strong></span></td>
+          <td class="num" style="font-weight:600">¥{{ "%.2f"|format(c.value) }}</td>
+          <td>
+            <div class="flex gap-2" style="align-items:center">
+              <div style="flex:1;height:6px;background:var(--bg-raised);border-radius:3px;overflow:hidden">
+                <i style="display:block;height:100%;width:{{ pct }}%;background:var(--accent)"></i>
+              </div>
+              <span class="num sub" style="width:38px;text-align:right">{{ pct }}%</span>
+            </div>
+          </td>
+          <td class="muted"><span class="reltime" data-ts="{{ c.ts }}">{{ c.ts[:16] }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="empty">暂无开箱数据</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

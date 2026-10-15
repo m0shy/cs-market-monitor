@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}库存详情 · CS2 Market Desk{% endblock %}
+{% block content %}
+
+<nav class="breadcrumb" aria-label="面包屑">
+  <a href="/assets/inventory">库存覆盖</a><span>/</span><span>库存查询</span>
+</nav>
+
+<header class="page-head">
+  <div>
+    <div class="eyebrow">Inventory / Snapshot</div>
+    <h1>库存查询结果</h1>
+    <p class="sub num">{{ inventory_id }}</p>
+  </div>
+  <div class="flex gap-2">
+    <span class="chip">无库存快照</span>
+    <a class="btn primary" href="/assets/inventory?q={{ inventory_id|urlencode }}">返回查询</a>
+  </div>
+</header>
+
+<section class="grid grid-2">
+  <section class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><h2>查询状态</h2></div>
+      <span class="tag warn">等待接入</span>
+    </div>
+    <div class="metric-card" style="margin-bottom:12px">
+      <span class="metric-label">库存估值</span>
+      <span class="metric-value muted" style="font-size:30px">无快照</span>
+      <span class="metric-sub">{{ workspace.message }}</span>
+    </div>
+    <ol style="list-style:none;display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--text-3)">
+      <li class="flex gap-2"><span class="tag down">已完成</span>读取查询参数</li>
+      <li class="flex gap-2"><span class="tag warn">未命中</span>没有对应的持仓记录</li>
+      <li class="flex gap-2"><span class="tag flat">待接入</span>个人库存采集尚未接入</li>
+    </ol>
+    <a class="btn mt-4" href="/market/items">先浏览市场参考</a>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><h2>可用市场参考</h2><span class="sub">与查询参数无关的公开报价</span></div>
+    </div>
+    <div class="table-scroll" style="max-height:420px">
+      <table class="data-table">
+        <thead><tr><th>饰品</th><th class="num">BUFF</th><th class="num">导购挂单</th><th>更新时间</th></tr></thead>
+        <tbody>
+          {% for r in workspace.references %}
+          <tr>
+            <td>
+              <a class="flex gap-2" href="/market/items/{{ r.name|urlencode }}?from={{ ('/assets/inventory/' ~ inventory_id)|urlencode }}">
+                {% if r.profile.get('image_url') %}<img src="/api/image?url={{ r.profile.get('image_url')|urlencode }}" alt="" loading="lazy" style="width:32px;height:24px;object-fit:contain;flex:none">{% endif %}
+                <span><strong>{{ r.name }}</strong><br><span class="sub">{{ r.profile.get('rarity') or 'CS2 饰品' }}</span></span>
+              </a>
+            </td>
+            <td class="num" style="font-weight:600">{{ "%.2f"|format(r.price) if r.price is not none else '-' }}</td>
+            <td class="num">{{ "{:,}".format(r.supply|int) if r.supply is not none else '-' }}</td>
+            <td class="muted"><span class="reltime" data-ts="{{ r.ts }}">{{ r.ts[:16] if r.ts else '-' }}</span></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="empty">暂无参考快照</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}

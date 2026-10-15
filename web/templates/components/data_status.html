@@ -1,0 +1,11 @@
+{% macro status_line(source, as_of, state='ready', note='', element_id='') %}
+{% set status = freshness_status(as_of, state) %}
+<div class="provenance" data-status="{{ status }}"{% if element_id %} id="{{ element_id }}"{% endif %}>
+  <i data-lucide="database" aria-hidden="true"></i>
+  <span class="provenance-source">{{ source }}</span>
+  <span class="provenance-state">{{ {'ready': '可用', 'partial': '部分覆盖', 'collecting': '采集中', 'stale': '数据过期', 'missing': '尚无数据', 'blocked': '来源受限', 'error': '读取失败'}.get(status, status) }}</span>
+  {% if as_of %}<time datetime="{{ as_of }}">更新 {{ market_time_label(as_of) }}（北京时间）</time>{% else %}<span>无更新时间</span>{% endif %}
+  {% if note %}<span class="provenance-note">{{ note }}</span>{% endif %}
+  <a href="/data/coverage" aria-label="查看采集覆盖">覆盖详情<i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
+</div>
+{% endmacro %}

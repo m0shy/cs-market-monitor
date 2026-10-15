@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}{{ workspace.view_meta.title if workspace is defined else '库存覆盖' }} · CS2 Market Desk{% endblock %}
+{% block content %}
+{% set meta = workspace.view_meta %}
+
+<header class="page-head">
+  <div>
+    <div class="eyebrow">{{ meta.eyebrow }}</div>
+    <h1>{{ meta.title }}</h1>
+    <p class="sub">{{ meta.description }}</p>
+  </div>
+  <div class="flex gap-2">
+    <span class="chip">公开市场数据</span>
+    <a class="btn" href="/market/items">浏览饰品市场</a>
+  </div>
+</header>
+
+{% set inv_status = freshness_status(workspace.references[0].ts if workspace.references else none, 'partial' if workspace.references else 'collecting') %}
+<div class="flex-wrap" style="gap:8px;font-size:12px;color:var(--text-3);margin-bottom:12px">
+  <span class="tag info">行情站B 公开市场参考</span>
+  <span class="tag {{ 'down' if inv_status == 'ready' else ('warn' if inv_status in ('partial', 'stale', 'blocked', 'error') else 'flat') }}">{{ {'ready': '可用', 'partial': '部分覆盖', 'collecting': '采集中', 'stale': '数据过期', 'missing': '尚无数据', 'blocked': '来源受限', 'error': '读取失败'}.get(inv_status, inv_status) }}</span>
+  {% if workspace.references %}<span class="num">更新 {{ market_time_label(workspace.references[0].ts) }}（北京时间）</span>{% else %}<span>无更新时间</span>{% endif %}
+  <span>没有可用个人持仓；参考价不能用于计算库存估值</span>
+  <a href="/data/coverage">覆盖详情</a>
+</div>
+
+<section class="panel" style="padding-bottom:12px">
+  <form class="flex-wrap" method="get" action="{{ '/assets/inventory/' ~ workspace.view if workspace.view != 'estimate' else '/assets/inventory' }}" style="gap:8px">
+    <span class="input-shell" style="flex:1;min-width:240px"><input type="search" name="q" value="{{ workspace.query }}" placeholder="7656119... 或 Steam 库存链接" autocomplete="off"></span>
+    <button class="btn primary" type="submit">检查覆盖</button>
+  </form>
+  <div class="flex gap-1" role="tablist" aria-label="库存视图" style="margin-top:10px">
+    <a class="btn sm {{ 'primary' if workspace.view == 'estimate' else '' }}" href="/assets/inventory{% if workspace.query %}?q={{ workspace.query|urlencode }}{% endif %}" role="tab" aria-selected="{{ 'true' if workspace.view == 'estimate' else 'false' }}">库存覆盖</a>
+    <a class="btn sm {{ 'primary' if workspace.view == 'changes' else '' }}" href="/assets/inventory/changes{% if workspace.query %}?q={{ workspace.query|urlencode }}{% endif %}" role="tab" aria-selected="{{ 'true' if workspace.view == 'changes' else 'false' }}">库存涨跌</a>
+    <a class="btn sm {{ 'primary' if workspace.view == 'history' else '' }}" href="/assets/inventory/history{% if workspace.query %}?q={{ workspace.query|urlencode }}{% endif %}" role="tab" aria-selected="{{ 'true' if workspace.view == 'history' else 'false' }}">历史持仓</a>
+  </div>
+</section>
+
+<section class="grid grid-3" style="margin-bottom:12px">
+  <article class="metric-card">
+    <span class="metric-label">库存估值 <span class="tag warn">缺少持仓</span></span>
+    <span class="metric-value" style="font-size:30px">{{ '无快照' if workspace.query else '未接入' }}</span>
+    <span class="metric-sub">{{ workspace.message }}</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">今日盈亏</span>
+    <span class="metric-value muted" style="font-size:30px">—</span>
+    <span class="metric-sub">需接入库存快照后计算</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">市场参考 <span class="tag info">快照</span></span>
+    <span class="metric-value" style="font-size:30px">{{ workspace.references|length }}</span>
+    <span class="metric-sub">来自当前导购热度榜 · 件</span>
+  </article>
+</section>
+
+<section class="grid grid-2">
+  <section class="panel">
+    <div class="empty-state">
+      <strong>{{ meta.empty_pending if workspace.query else meta.empty_title }}</strong>
+      <p>{{ workspace.message }}</p>
+      {% if workspace.query %}
+      <a class="btn sm" href="/assets/inventory">重新输入</a>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><h2>{{ meta.reference_title }}</h2><span class="sub">{{ meta.reference_subtitle }}</span></div>
+      <a class="btn sm" href="/research/rankings">查看榜单</a>
+    </div>
+    <div class="table-scroll" style="max-height:420px">
+      <table class="data-table">
+        <thead><tr><th>饰品</th><th class="num">BUFF</th><th class="num">导购挂单</th><th>更新时间</th></tr></thead>
+        <tbody>
+          {% for r in workspace.references %}
+          <tr>
+            <td>
+              <a class="flex gap-2" href="/market/items/{{ r.name|urlencode }}?from=/assets/inventory">
+                {% if r.profile.get('image_url') %}<img src="/api/image?url={{ r.profile.get('image_url')|urlencode }}" alt="" loading="lazy" style="width:32px;height:24px;object-fit:contain;flex:none">{% endif %}
+                <span><strong>{{ r.name }}</strong><br><span class="sub">{{ r.profile.get('rarity') or 'CS2 饰品' }}</span></span>
+              </a>
+            </td>
+            <td class="num" style="font-weight:600">{{ "%.2f"|format(r.price) if r.price is not none else '-' }}</td>
+            <td class="num">{{ "{:,}".format(r.supply|int) if r.supply is not none else '-' }}</td>
+            <td class="muted"><span class="reltime" data-ts="{{ r.ts }}">{{ r.ts[:16] if r.ts else '-' }}</span></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="empty">暂无市场参考数据</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}

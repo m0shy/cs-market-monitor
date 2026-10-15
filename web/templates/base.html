@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}CS2 Market Desk{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/terminal.css">
+{% if active|default('index') in ['index', 'item', 'market', 'section', 'realtime', 'trend'] %}
+<script src="/static/echarts.min.js" defer></script>
+{% endif %}
+<script src="/static/lucide.min.js" defer></script>
+<script src="/static/app.js?v={{ app_js_version }}" defer></script>
+<script src="/static/realtime.js?v={{ realtime_js_version }}" defer></script>
+<script src="/static/desk.js" defer></script>
+{% block scripts %}{% endblock %}
+</head>
+{% set current_page = active|default('index') %}
+{% set channel = channel_for(current_page) %}
+<body class="page-{{ current_page }} channel-{{ channel.key }}" data-page="{{ current_page }}">
+<a class="skip-link" href="#main-content">跳到主要内容</a>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <a class="brand-mark" href="/" aria-label="返回监测台"><span class="logo">C2</span></a>
+      <a class="brand-copy" href="/">
+        <strong>CS2 Market Desk</strong>
+        <span>市场研究与监控</span>
+      </a>
+    </div>
+    <nav class="main-nav" id="main-nav" aria-label="主要导航">
+      {% for entry in channels %}
+      <a href="{{ entry.href }}" class="{{ 'active' if entry.key == channel.key else '' }}"
+        {% if entry.key == channel.key %}aria-current="page"{% endif %}>
+        <i data-lucide="{{ entry.icon }}" aria-hidden="true"></i><span>{{ entry.label }}</span>
+      </a>
+      {% endfor %}
+    </nav>
+    <div class="top-actions">
+        <span class="nav-index" id="nav-index" title="行情站B 大盘指数">
+          <span class="nav-index-val">—</span>
+          <em class="nav-index-diff">—</em>
+        </span>
+      <a class="market-live rt-live-link" href="/realtime" title="实时=推送通道（大盘指数/新上架流）与采集器在线；单品数据新鲜度以各页数据状态条为准">
+        <span class="rt-live-dot" id="rt-live-dot" data-state="off"></span>
+        <i data-lucide="activity" aria-hidden="true"></i><span id="rt-live-label">实时</span>
+      </a>
+      <a class="market-live" href="/data/coverage" title="查看采集覆盖与更新时间"><i data-lucide="database-zap" aria-hidden="true"></i><span>数据状态</span><span id="rt-data-alert" style="display:none;width:8px;height:8px;border-radius:50%;background:#ff5c5c;margin-left:4px"></span></a>
+      <button class="search-trigger" id="search-trigger" type="button" aria-haspopup="dialog" aria-controls="search-overlay" aria-expanded="false" aria-label="搜索饰品">
+        <i data-lucide="search" aria-hidden="true"></i>
+        <span>搜索饰品</span>
+        <kbd>/</kbd>
+      </button>
+      <button class="icon-btn nav-toggle" id="nav-toggle" type="button" aria-label="展开导航" aria-expanded="false" aria-controls="main-nav">
+        <i data-lucide="menu" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
+</header>
+<button class="nav-backdrop" id="nav-backdrop" type="button" aria-label="关闭导航"></button>
+
+{% if channel.links %}
+<div class="context-bar">
+  <div class="context-inner">
+    <span class="context-label">{{ channel.label }}</span>
+    <nav aria-label="{{ channel.label }}子导航">
+      {% for link in channel.links %}
+      <a href="{{ link.href }}" class="{{ 'active' if current_page == link.page else '' }}"
+        {% if current_page == link.page %}aria-current="page"{% endif %}>{{ link.label }}</a>
+      {% endfor %}
+      {% if current_page == 'item' %}<span class="context-current">饰品详情</span>{% endif %}
+      {% if current_page == 'event' %}<span class="context-current">事件详情</span>{% endif %}
+    </nav>
+  </div>
+</div>
+{% endif %}
+
+<div class="search-overlay hidden" id="search-overlay" role="dialog" aria-modal="true" aria-label="全局搜索">
+  <div class="search-modal">
+    <div class="search-heading">
+      <div><span class="eyebrow">检索</span><h2>搜索饰品</h2></div>
+      <button class="search-close icon-btn" id="search-close" type="button" aria-label="关闭搜索"><i data-lucide="x" aria-hidden="true"></i></button>
+    </div>
+    <div class="search-type-tabs" role="tablist" id="search-tabs">
+      <button id="search-tab-all" class="active" data-type="all" role="tab" aria-selected="true" aria-controls="search-results">全部</button>
+      <button id="search-tab-item" data-type="item" role="tab" aria-selected="false" aria-controls="search-results">详情</button>
+      <button id="search-tab-items" data-type="items" role="tab" aria-selected="false" aria-controls="search-results">目录</button>
+      <button id="search-tab-tracker" data-type="tracker" role="tab" aria-selected="false" aria-controls="search-results">异动</button>
+    </div>
+    <div class="search-big">
+      <i class="search-ico" data-lucide="search" aria-hidden="true"></i>
+      <input id="search-input" type="search" placeholder="输入饰品名称" autocomplete="off" aria-label="搜索饰品" aria-controls="search-results" aria-autocomplete="list">
+      <button class="btn primary" id="search-go">搜索</button>
+    </div>
+    <div class="search-results hidden" id="search-results" role="listbox" aria-label="搜索结果"></div>
+    <div class="search-history" id="search-history"><span class="lbl">最近搜索</span></div>
+    <div class="search-hint">
+      <span><kbd>&#8593;</kbd><kbd>&#8595;</kbd> 选择结果</span>
+      <span><kbd>Enter</kbd> 打开</span>
+      <span><kbd>Esc</kbd> 关闭</span>
+    </div>
+  </div>
+</div>
+
+<main class="container" id="main-content">
+{% block content %}{% endblock %}
+</main>
+<footer class="footer">
+  <div>
+    <strong>CS2 Market Desk</strong>
+    <span>市场研究与监控</span>
+  </div>
+  <div>
+    <a href="/data/sources">来源与口径</a>
+    <a href="/data/coverage">采集覆盖</a>
+    <span>报价、成交与历史数据以各页面标注的来源和时间为准。</span>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}采集进度 · CS2 Market Desk{% endblock %}
+{% block content %}
+
+<nav class="breadcrumb" aria-label="面包屑">
+  <a href="/">市场总览</a><span>/</span><span>采集进度</span>
+</nav>
+
+<header class="page-head">
+  <div>
+    <div class="eyebrow">Data / Coverage</div>
+    <h1>数据采集进度</h1>
+    <p class="sub">目录、K 线、扩展详情与站点历史的覆盖情况，失败与额度等待单独标注</p>
+  </div>
+  <div class="flex gap-2">
+    <span class="sub num" id="acquisition-refresh">{{ workspace.generated_at[:16] }}</span>
+    <a class="btn" href="/data/sources">数据来源</a>
+    <a class="btn" href="/data/updates">更新记录</a>
+    <a class="btn primary" href="/market/items">使用市场</a>
+  </div>
+</header>
+
+<section class="grid grid-3" style="margin-bottom:12px">
+  <article class="metric-card">
+    <span class="metric-label">目录规模 <span class="tag info">本地库</span></span>
+    <span class="metric-value" id="acq-catalog" style="font-size:30px">{{ "{:,}".format(workspace.catalog_items) }}</span>
+    <span class="metric-sub">行情站B Open API 目录 · 件</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">整体状态 <span class="tag {{ 'down' if workspace.all_complete else 'warn' }}">{{ 'COMPLETE' if workspace.all_complete else 'RUNNING' }}</span></span>
+    <span class="metric-value" id="acq-status" style="font-size:30px">{{ '已完成' if workspace.all_complete else '进行中' }}</span>
+    <span class="metric-sub">任务按覆盖率计算</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">更新时间 <span class="tag flat">自动</span></span>
+    <span class="metric-value" id="acq-updated" style="font-size:24px">{{ workspace.generated_at|tslabel }}</span>
+    <span class="metric-sub">每 10 秒刷新状态</span>
+  </article>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <div class="panel-title"><h2>任务覆盖</h2><span class="sub">已处理 / 总量 / 待重试 · 更新频率：<span style="background:var(--accent-soft);color:var(--accent);padding:1px 6px;border-radius:4px">蓝=分钟级</span> <span style="background:var(--warn-soft);color:var(--warn);padding:1px 6px;border-radius:4px">橙=小时级</span></span></div>
+  </div>
+  <div id="acquisition-task-list">
+    {% for task in workspace.tasks %}
+    {% set freq = {'siteb_catalog': '分钟级', 'siteb_kline': '10分钟级'}.get(task.key, '小时级') %}
+    <article data-task-key="{{ task.key }}" style="padding:12px 0;border-bottom:1px solid var(--border)">
+      <div class="flex-between" style="margin-bottom:8px">
+        <div class="flex gap-2">
+          <strong style="font-size:13px">{{ task.label }}</strong>
+          <span {% if freq == '小时级' %}style="background:var(--warn-soft);color:var(--warn);padding:1px 8px;border-radius:4px;font-size:11px"{% else %}style="background:var(--accent-soft);color:var(--accent);padding:1px 8px;border-radius:4px;font-size:11px"{% endif %}>{{ freq }}</span>
+          <span class="tag {{ 'down' if task.status in ('complete', 'limited') else ('info' if task.status == 'running' else 'flat') }}">{{ task.status|upper }}</span>
+        </div>
+        <span class="num" style="font-size:13px;font-weight:600">{{ task.percent }}%</span>
+      </div>
+      <div style="height:6px;background:var(--bg-raised);border-radius:3px;overflow:hidden">
+        <i style="display:block;height:100%;width:{{ task.percent }}%;background:{{ 'var(--down)' if task.status in ('complete', 'limited') else 'var(--accent)' }}"></i>
+      </div>
+      <div class="flex-between num" style="margin-top:6px;font-size:12px;color:var(--text-3)">
+        <span>{{ "{:,}".format(task.current) }} / {{ "{:,}".format(task.total) if task.total else '—' }}</span>
+        <span class="flex gap-3">
+          <span>剩余 {{ "{:,}".format(task.remaining) if task.total else '—' }}</span>
+          <span>未解决 {{ task.unresolved }}</span>
+          {% if task.updated_at %}<span>{{ task.updated_at|tslabel }}</span>{% endif %}
+        </span>
+      </div>
+      {% if task.blocker %}<p class="mt-1" style="font-size:12px;color:var(--warn)">⏸ {{ task.blocker }}</p>{% endif %}
+      {% if task.note %}<p class="mt-1 sub" style="font-size:12px">{{ task.note }}</p>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  <p class="sub mt-3" style="font-size:12px">进度为采集器游标与已解决失败项的综合状态；额度等待、网络熔断和待重试请求保留在任务说明中。</p>
+</section>
+
+<script id="acquisition-data" type="application/json">{{ workspace|tojson }}</script>
+{% endblock %}

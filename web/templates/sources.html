@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "components/data_status.html" import status_line %}
+{% block title %}数据来源 · CS2 Market Desk{% endblock %}
+{% block content %}
+<nav class="crumb" aria-label="面包屑"><a href="/">监测台</a><span>/</span><a href="/data/coverage">数据中心</a><span>/</span><em>数据源</em></nav>
+<header class="workspace-head"><div><span class="eyebrow">Data / Provenance</span><h1>数据来源与口径</h1>
+  <p>不同来源独立展示；图表、报价、采集覆盖都使用各自的时间和计算口径。</p></div>
+  <div class="workspace-actions"><a class="btn" href="/data/coverage"><i data-lucide="database-zap" aria-hidden="true"></i>采集覆盖</a></div></header>
+<div class="source-guide">
+  {% for key, source in sources.items() %}
+  <section class="source-entry"><h2>{{ source.get('name') or key|upper }}</h2>
+    {{ status_line(key|upper, source.get('as_of'), 'ready' if source.get('value') is not none else 'collecting') }}
+    <dl><div><dt>当前指数</dt><dd>{{ '%.2f'|format(source.get('value')) if source.get('value') is not none else '未采集' }}</dd></div>
+      <div><dt>支持周期</dt><dd>{{ (source.get('supported_periods') or [])|join(' / ') }}</dd></div></dl>
+    <a href="/research/index?source={{ key }}">查看该来源走势<i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
+  </section>
+  {% endfor %}
+</div>
+<section class="source-method"><h2>页面数据如何解释</h2>
+  <div><strong>指数</strong><span>行情站B 与 行情站A 的指数定义不同；切换来源时替换图表，不拼接成同一条序列。</span></div>
+  <div><strong>平台报价</strong><span>不同平台的快照时间可能不同。报价差异不等于实际可成交利润。</span></div>
+  <div><strong>历史价格</strong><span>站点买卖历史缺失时可由公开日 K 收盘价临时呈现，并显示“部分覆盖”。</span></div>
+  <div><strong>采集状态</strong><span>完整、部分覆盖、采集中、缺失、受限和过期分别标记。具体进度见采集覆盖页。</span></div>
+</section>
+{% endblock %}

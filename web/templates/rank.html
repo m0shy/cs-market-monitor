@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% from "components/data_status.html" import status_line %}
+{% block title %}机会榜单 · CS2 Market Desk{% endblock %}
+{% block content %}
+{% set selected_rank = initial_rank|default('hot') %}
+
+{# —— 榜单页终端组件（terminal.css 之外的模板级补充，仅本页生效） —— #}
+<style>
+  .seg{display:inline-flex;gap:2px;padding:3px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r)}
+  .seg button{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:var(--r-sm);font-size:13px;color:var(--text-2);white-space:nowrap;transition:all var(--t-fast)}
+  .seg button:hover{color:var(--text);background:var(--surface-hi)}
+  .seg button.active{color:#fff;background:var(--accent-soft);font-weight:600}
+  .seg button svg{width:14px;height:14px}
+  .v3-seg{display:inline-flex;gap:2px;padding:2px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r-sm)}
+  .v3-seg button{padding:4px 10px;border-radius:4px;font-size:12px;color:var(--text-3)}
+  .v3-seg button:hover{color:var(--text)}
+  .v3-seg button.active{background:var(--accent);color:#fff;font-weight:600}
+  .rank-pane{display:none}
+  .rank-pane.active{display:block}
+  .rank-num{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 4px;border-radius:var(--r-sm);font-family:var(--mono);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;background:var(--surface-active);color:var(--text-2)}
+  .rank-num.r1{background:linear-gradient(135deg,#ffd700,#ffb02e);color:#241a04}
+  .rank-num.r2{background:linear-gradient(135deg,#dfe6f1,#a8b4c6);color:#141a26}
+  .rank-num.r3{background:linear-gradient(135deg,#e8a06a,#cd7f32);color:#241004}
+  .item-cell{display:flex;align-items:center;gap:10px;min-width:0;color:var(--text)}
+  .item-cell strong{display:block;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600;color:var(--text)}
+  .item-cell small{display:block;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-3);font-size:11px}
+  .item-thumb{flex:none;display:inline-grid;place-items:center;width:46px;height:34px;border-radius:var(--r-sm);background:var(--bg-raised);border:1px solid var(--border);overflow:hidden}
+  .item-thumb.tiny{width:38px;height:28px}
+  .item-thumb img{width:100%;height:100%;object-fit:contain}
+  .item-thumb svg{width:16px;height:16px;color:var(--text-3)}
+  .chip-num{display:inline-block;min-width:64px;text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;font-weight:600}
+  .chip-num.up{color:var(--up)}
+  .chip-num.down{color:var(--down)}
+  .refresh-hint{font-size:11px;color:var(--text-3);white-space:nowrap;font-variant-numeric:tabular-nums}
+</style>
+
+<header class="page-head">
+  <div>
+    <span class="eyebrow">Market ladders</span>
+    <h1>机会榜单</h1>
+    <p class="sub">按导购挂单、价格偏离与涨跌幅扫描活跃饰品，不把单一排行等同于交易建议。</p>
+  </div>
+  <div class="flex">
+    <span class="refresh-hint" id="rank-refresh"></span>
+    <a class="btn" href="/monitor/radar"><i data-lucide="radar" aria-hidden="true"></i>异动雷达</a>
+  </div>
+</header>
+{{ status_line('行情站B 平台快照 / BUFF 7 日均价', hot[0].ts if hot else none, 'partial' if hot else 'collecting', '活跃标的样本，涨跌幅是相对均价偏离') }}
+
+<section class="panel">
+  <div class="panel-head">
+    <div class="seg" role="tablist" aria-label="榜单类型">
+      <button id="rank-tab-hot" class="{{ 'active' if selected_rank == 'hot' else '' }}" data-rank="hot" role="tab" aria-selected="{{ 'true' if selected_rank == 'hot' else 'false' }}" aria-controls="rank-hot"><i data-lucide="flame" aria-hidden="true"></i>导购热度</button>
+      <button id="rank-tab-gain" class="{{ 'active' if selected_rank == 'gain' else '' }}" data-rank="gain" role="tab" aria-selected="{{ 'true' if selected_rank == 'gain' else 'false' }}" aria-controls="rank-gain"><i data-lucide="trending-up" aria-hidden="true"></i>涨幅榜</button>
+      <button id="rank-tab-loss" class="{{ 'active' if selected_rank == 'loss' else '' }}" data-rank="loss" role="tab" aria-selected="{{ 'true' if selected_rank == 'loss' else 'false' }}" aria-controls="rank-loss"><i data-lucide="trending-down" aria-hidden="true"></i>跌幅榜</button>
+    </div>
+    <span class="sub">BUFF 现价相对 7 日均价偏离 · 前三名为奖牌位</span>
+  </div>
+
+  <div class="rank-pane {{ 'active' if selected_rank == 'hot' else '' }}" id="rank-hot" role="tabpanel" aria-labelledby="rank-tab-hot" aria-hidden="{{ 'false' if selected_rank == 'hot' else 'true' }}">
+    <div class="flex-between mb-3">
+      <div class="sub">UU、C5、Steam 与 Halo 在售挂单合计，结合 BUFF 7 日均价观察。</div>
+      <div class="v3-seg" data-sort-pane="hot" aria-label="导购热度排序">
+        <button class="active" data-sort="default">综合</button>
+        <button data-sort="price">价格</button>
+        <button data-sort="diff">偏离</button>
+        <button data-sort="broker">挂单量</button>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr><th>#</th><th>饰品</th><th class="num">导购挂单</th><th class="num">UU(¥)</th><th class="num">C5(¥)</th>
+            <th class="num">Steam(¥)</th><th class="num">Halo(¥)</th><th class="num">BUFF(¥)</th><th class="num">7 日均价(¥)</th>
+            <th class="num">偏离</th><th>更新</th></tr>
+        </thead>
+        <tbody data-kind="hot">
+          {% for r in hot %}
+          {% set d = r.diff.get('buff') %}
+          <tr>
+            <td><span class="rank-num {{ 'r1' if loop.index == 1 else ('r2' if loop.index == 2 else ('r3' if loop.index == 3 else '')) }}">{{ loop.index }}</span></td>
+            <td>
+              <a class="item-cell" href="/market/items/{{ r.name|urlencode }}?from=/research/rankings">
+                <span class="item-thumb">{% if r.profile.get('image_url') %}<img src="/api/image?url={{ r.profile.get('image_url')|urlencode }}" alt="" loading="lazy">{% else %}<i data-lucide="package" aria-hidden="true"></i>{% endif %}</span>
+                <span><strong>{{ r.name }}</strong><small>{{ r.profile.get('rarity') or 'CS2 饰品' }}</small></span>
+              </a>
+            </td>
+            <td class="num" style="font-weight:600">{{ "{:,}".format(r.broker_sell|int) }}</td>
+            <td class="num">{{ "%.2f"|format(r.price.get('youpin')) if r.price.get('youpin') else '-' }}</td>
+            <td class="num">{{ "%.2f"|format(r.price.get('c5')) if r.price.get('c5') else '-' }}</td>
+            <td class="num">{{ "%.2f"|format(r.price.get('steam')) if r.price.get('steam') else '-' }}</td>
+            <td class="num">{{ "%.2f"|format(r.price.get('haloskins')) if r.price.get('haloskins') else '-' }}</td>
+            <td class="num">{{ "%.2f"|format(r.price.get('buff')) if r.price.get('buff') else '-' }}</td>
+            <td class="num">{{ "%.2f"|format(r.avg7.get('buff')) if r.avg7.get('buff') else '-' }}</td>
+            <td class="num"><span class="chip-num {{ 'up' if (d or 0) >= 0 else 'down' }}">{{ ("%+.2f%%"|format(d)) if d is not none else '-' }}</span></td>
+            <td class="muted"><span class="reltime" data-ts="{{ r.ts }}">{{ r.ts[:16] }}</span></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="11" class="empty">暂无数据</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% for kind in ['gain', 'loss'] %}
+  {% set records = gain if kind == 'gain' else loss %}
+  <div class="rank-pane {{ 'active' if selected_rank == kind else '' }}" id="rank-{{ kind }}" role="tabpanel" aria-labelledby="rank-tab-{{ kind }}" aria-hidden="{{ 'false' if selected_rank == kind else 'true' }}">
+    <div class="flex-between mb-3">
+      <div class="sub">BUFF 最新报价相对 7 日均价的偏离，实时快照可能存在短时波动。</div>
+      <div class="v3-seg" data-sort-pane="{{ kind }}" aria-label="{{ '涨幅榜' if kind == 'gain' else '跌幅榜' }}排序">
+        <button class="active" data-sort="default">综合</button>
+        <button data-sort="price">价格</button>
+        <button data-sort="diff">涨跌</button>
+        <button data-sort="broker">挂单量</button>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr><th>#</th><th>饰品</th><th class="num">BUFF 现价</th><th class="num">7 日均价</th>
+            <th class="num">偏离</th><th class="num">导购挂单</th><th>更新</th></tr>
+        </thead>
+        <tbody data-kind="{{ kind }}">
+          {% for r in records %}
+          {% set d = r.diff.get('buff') %}
+          <tr>
+            <td><span class="rank-num {{ 'r1' if loop.index == 1 else ('r2' if loop.index == 2 else ('r3' if loop.index == 3 else '')) }}">{{ loop.index }}</span></td>
+            <td>
+              <a class="item-cell" href="/market/items/{{ r.name|urlencode }}?from=/research/rankings">
+                <span class="item-thumb">{% if r.profile.get('image_url') %}<img src="/api/image?url={{ r.profile.get('image_url')|urlencode }}" alt="" loading="lazy">{% else %}<i data-lucide="package" aria-hidden="true"></i>{% endif %}</span>
+                <span><strong>{{ r.name }}</strong><small>{{ r.profile.get('rarity') or 'CS2 饰品' }}</small></span>
+              </a>
+            </td>
+            <td class="num">{{ "%.2f"|format(r.price.get('buff')) if r.price.get('buff') else '-' }}</td>
+            <td class="num">{{ "%.2f"|format(r.avg7.get('buff')) if r.avg7.get('buff') else '-' }}</td>
+            <td class="num"><span class="chip-num {{ 'up' if (d or 0) >= 0 else 'down' }}">{{ ("%+.2f%%"|format(d)) if d is not none else '-' }}</span></td>
+            <td class="num" style="font-weight:600">{{ "{:,}".format(r.broker_sell|int) }}</td>
+            <td class="muted"><span class="reltime" data-ts="{{ r.ts }}">{{ r.ts[:16] }}</span></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="empty">暂无数据</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+</section>
+{% endblock %}
